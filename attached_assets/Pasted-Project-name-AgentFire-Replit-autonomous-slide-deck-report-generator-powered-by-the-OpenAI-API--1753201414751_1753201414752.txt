@@ -1,0 +1,74 @@
+Project name: AgentFire‑Replit — autonomous slide‑deck & report generator powered by the OpenAI API
+
+Migration context:
+• We’re porting an existing Firebase Studio AI agent.
+• That agent already successfully:
+   – takes a natural‑language prompt such as “Create a professional presentation on best pharmacy practices in BC, Canada in 2025”
+   – does multi‑query web search → synthesises a 10–20‑slide outline (LLM)
+   – fetches royalty‑free images (Unsplash → Picsum fallback), charts via QuickChart, builds a rich .pptx (~600‑950 kB)
+   – writes granular logs ([trace], [step_start], [step_end], [delivery])
+• Remaining pain‑points we must fix while migrating:
+   1. Firebase Studio’s sandbox paths (/sandbox/…) aren’t publicly served, so deliverable links 404.
+   2. Its React front‑end often stays stuck on “Waiting for task…” even after [delivery] ✅ Artifacts emitted.
+   3. Socket events occasionally drop; Unsplash 503 bursts still spam the log (now throttled).
+• Goal on Replit: end‑to‑end reliable delivery — downloadable links appear in the chat and in a simple HTML dashboard every run.
+
+Functional spec (keep parity with old agent, then improve):
+
+Planner: break user prompt into: web search tasks (3–5 queries), “synthesise outline”, “match visuals”, “finalise”.
+
+Searcher: use SerpAPI or DuckDuckGo API (env‑controlled key) → return top 10 URLs & snippets.
+
+Outline synthesiser (OpenAI chat completion): produce JSON with ≥ 10 slides; each body slide provides title, bullets, keyword, optional chart spec.
+
+Visual matcher
+   – image pipeline: Unsplash Random → Pixabay → Picsum fallback; debounce 503 warnings.
+   – chart pipeline: QuickChart PNG from chart spec.
+
+Builder: assemble .pptx via python‑pptx (or pptxgenjs if we stay JS). Validate: ≥ 10 slides, ≥ 5 charts, ≥ 5 images, file size > 200 kB.
+
+Delivery layer (new)
+   – store output files in /mnt/data/artifacts/ (Replit persistent FS)
+   – upload to Replit’s built‑in HTTP file server or to a free storage bucket (e.g. Cloudflare R2) and return public URLs
+   – post a final chatbot message:
+     “✅ Presentation ready → [Download PPTX] … | [Build log] …”
+   – emit a small REST endpoint (/latest) that returns JSON {pptx_url, log_url, size, timestamp} so I can embed elsewhere.
+
+CLI entry‑point (npm run agent "<user prompt>") for testing without UI.
+
+Tech stack preference (feel free to propose better):
+• Node 18 (ESM) for orchestration
+• axios + cheerio for quick scraping (search snippets)
+• OpenAI SDK @latest
+• QuickChart.io for charts
+• pptxgenjs (browser‑safe) or python‑pptx with child‑process call — choose whichever Ghostwriter can wire fastest
+• Express + Socket.IO for minimal real‑time log streaming to the web dashboard
+• Tailwind CSS‑lite dashboard (static HTML) that shows: live log, slide thumbnails, download buttons
+
+Non‑negotiables:
+• Logs stay as they are (step_start / step_end / trace / delivery) — pipe to both console & run_<timestamp>.log.txt.
+• Agent personas & voice weren’t critical — we just need plaintext/chat replies.
+• No Firebase dependencies; environment variables via Replit Secrets.
+• Code must run on Replit’s free tier (0.5 vCPU, 512 MB RAM) — so watch memory when building the PPTX.
+• Deliverable links must work every time (we can base64‑inline files < 8 MB as fallback).
+
+Migration plan Ghostwriter should follow:
+
+Scaffold repo: /src (planner, searcher, builder), /public (dashboard), /logs, /artifacts.
+
+Implement search → outline → build pipeline with stub data first; verify .pptx saves to artifacts folder.
+
+Add log streaming & dashboard.
+
+Plug in real APIs & environment variables.
+
+Stress‑test with the pharmacy BC 2025 prompt.
+
+Document setup & run instructions in README.md.
+
+I will paste the original Firebase code modules (executor.ts, imageMatch.ts, planner.tsx, etc.) one‑by‑one so we can salvage and adapt logic. Please be ready to map each part into the new structure. When I paste a file, respond with:
+“✅ File integrated: <filename>. Next file?”
+and nothing else, until I say “STOP”.
+
+Finally, after all files are in, generate a migration summary + todo list (bulleted) so we both know remaining gaps before the first live run.
+
