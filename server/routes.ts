@@ -93,16 +93,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           case "chat": {
             const { sessionId, content, persona, tone, contentAgentEnabled, apiKeys } = msg.data || {};
-            if (!apiKeys?.openai) {
-              safeSend(ws, { type: "error", data: { message: "OpenAI API key is required" } });
+            
+            // Use environment variable as fallback if no API key provided
+            const effectiveKeys = {
+              openai: apiKeys?.openai || process.env.OPENAI_API_KEY || "",
+              serpApi: apiKeys?.serpApi || process.env.SERP_API_KEY || "",
+              unsplash: apiKeys?.unsplash || process.env.UNSPLASH_ACCESS_KEY || "",
+            };
+            
+            if (!effectiveKeys.openai) {
+              safeSend(ws, { type: "error", data: { message: "OpenAI API key is required. Please enter it in the API Keys modal or set OPENAI_API_KEY environment variable." } });
               return;
             }
+            
             await agentService.startTask(
               sessionId || ws.sessionId || nanoid(),
               content,
               persona,
               tone,
-              apiKeys,
+              effectiveKeys,
               !!contentAgentEnabled,
             );
             break;

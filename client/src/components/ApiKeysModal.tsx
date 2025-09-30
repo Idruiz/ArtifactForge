@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,12 @@ interface ApiKeysModalProps {
 
 export function ApiKeysModal({ isOpen, onClose, apiKeys, onSave }: ApiKeysModalProps) {
   const [keys, setKeys] = useState<ApiKeys>(apiKeys);
+
+  useEffect(() => {
+    if (isOpen) {
+      setKeys(apiKeys);
+    }
+  }, [isOpen, apiKeys]);
 
   const handleSave = () => {
     onSave(keys);
