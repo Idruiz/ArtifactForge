@@ -70,28 +70,35 @@ export function AgentWorkspace(p: Props) {
       }) as Record<string, string>
     )[type.toLowerCase()] || "📁";
 
-  /* ─── conditional auto‑scroll (only if user near bottom) ─── */
+  /* ─── conditional auto-scroll (mobile-compatible) ─── */
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
-  const logScrollRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const scrollEl = chatScrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-    if (!scrollEl) return;
-    const isNearBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 100;
-    if (isNearBottom) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+    requestAnimationFrame(() => {
+      const container = chatContainerRef.current;
+      if (!container) return;
+      
+      // Check if user is near bottom (within 150px)
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+      if (isNearBottom) {
+        chatEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+      }
+    });
   }, [p.messages]);
 
   useEffect(() => {
-    const scrollEl = logScrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-    if (!scrollEl) return;
-    const isNearBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 100;
-    if (isNearBottom) {
-      logEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+    requestAnimationFrame(() => {
+      const container = logContainerRef.current;
+      if (!container) return;
+      
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+      if (isNearBottom) {
+        logEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+      }
+    });
   }, [p.logs]);
 
   return (
@@ -181,7 +188,7 @@ export function AgentWorkspace(p: Props) {
 
           {/* CHAT */}
           <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full p-4 md:p-6" ref={chatScrollRef}>
+            <div ref={chatContainerRef} className="h-full overflow-y-auto p-4 md:p-6" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
               <div className="space-y-4 max-w-4xl">
                 {p.messages.map((m) => {
                   const bg =
@@ -266,13 +273,12 @@ export function AgentWorkspace(p: Props) {
                 })}
                 <div ref={chatEndRef} />
               </div>
-              <ScrollBar orientation="vertical" />
-            </ScrollArea>
+            </div>
           </TabsContent>
 
           {/* LOGS */}
           <TabsContent value="logs" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full bg-slate-900 text-green-400 font-mono text-xs md:text-sm" ref={logScrollRef}>
+            <div ref={logContainerRef} className="h-full overflow-y-auto bg-slate-900 text-green-400 font-mono text-xs md:text-sm" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
               <div className="p-4 space-y-1">
                 {p.logs.map((l) => {
                   // ── guard: ensure ts is Date
@@ -298,8 +304,7 @@ export function AgentWorkspace(p: Props) {
                 )}
                 <div ref={logEndRef} />
               </div>
-              <ScrollBar orientation="vertical" />
-            </ScrollArea>
+            </div>
           </TabsContent>
 
           {/* ARTIFACTS */}

@@ -105,7 +105,7 @@ export default function Home() {
       },
     ]);
 
-    // send to server with conversation history for context
+    // send to server with conversation history for context (optimized - only essential data)
     sendMessage({
       type: "chat",
       data: {
@@ -115,7 +115,7 @@ export default function Home() {
         tone,
         contentAgentEnabled,
         apiKeys,
-        conversationHistory: allMessages.slice(-10), // last 10 messages for context
+        conversationHistory: allMessages.slice(-6).map(m => ({ role: m.role, content: m.content })), // last 6 messages, minimal data
       },
     });
 
@@ -158,7 +158,7 @@ export default function Home() {
               tone,
               contentAgentEnabled,
               apiKeys,
-              conversationHistory: allMessages.slice(-10),
+              conversationHistory: allMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
             },
           });
           setChatInput("");
