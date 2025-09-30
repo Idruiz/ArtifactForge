@@ -68,12 +68,12 @@ export function ChatPanel({
           </div>
           
           <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="sm" onClick={onShowApiKeys}>
+            <Button variant="ghost" size="sm" onClick={onShowApiKeys} data-testid="button-api-keys">
               <Key className="w-4 h-4 mr-2" />
               API Keys
             </Button>
             
-            <Button variant="ghost" size="sm" onClick={onRestartAgent}>
+            <Button variant="ghost" size="sm" onClick={onRestartAgent} data-testid="button-restart">
               <RotateCcw className="w-4 h-4 mr-2" />
               Restart
             </Button>
@@ -123,8 +123,15 @@ export function ChatPanel({
 
           {/* Content Agent Toggle */}
           <div className="flex items-center space-x-2">
-            <Label className="text-sm font-medium">Content Agent:</Label>
-            <Switch checked={contentAgentEnabled} onCheckedChange={onContentAgentToggle} />
+            <Label className="text-sm font-medium" title="When ON: Always generate artifacts. When OFF: Auto-detect based on your request.">
+              Content Agent:
+            </Label>
+            <Switch 
+              checked={contentAgentEnabled} 
+              onCheckedChange={onContentAgentToggle}
+              data-testid="switch-content-agent"
+            />
+            <span className="text-xs text-slate-500">{contentAgentEnabled ? "ON (Always Generate)" : "OFF (Auto-Detect)"}</span>
           </div>
         </div>
 
@@ -138,6 +145,7 @@ export function ChatPanel({
               onKeyDown={handleKeyDown}
               rows={2}
               className="resize-none pr-12"
+              data-testid="input-chat"
             />
             <Button
               variant="ghost"
@@ -149,7 +157,7 @@ export function ChatPanel({
               <Mic className={`w-5 h-5 ${isListening ? 'text-red-500 animate-pulse' : 'text-slate-400'}`} />
             </Button>
           </div>
-          <Button onClick={onSendMessage} disabled={!chatInput.trim()}>
+          <Button onClick={onSendMessage} disabled={!chatInput.trim()} data-testid="button-send">
             Send
           </Button>
         </div>

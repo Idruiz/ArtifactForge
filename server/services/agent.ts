@@ -98,7 +98,8 @@ class AgentService {
       searcherService.initialize(task.apiKeys.serpApi);
       visualMatcherService.initialize(task.apiKeys.unsplash);
 
-      if (contentAgentEnabled && this.isContentGenerationRequest(task.prompt)) {
+      // If toggle is ON, always generate content. If OFF, auto-detect based on prompt.
+      if (contentAgentEnabled || this.isContentGenerationRequest(task.prompt)) {
         await this.processContentGeneration(task);
       } else {
         await this.processChatResponse(task);

@@ -112,17 +112,19 @@ export function AgentWorkspace(p: Props) {
         {/* quick actions */}
         <div className="p-6 border-b border-gray-200">
           <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
-          {[
+          <p className="text-xs text-slate-500 mb-3">Click to start generating content</p>
+          {([
             ["presentation", BarChart3, "Create Presentation"],
             ["report", FileText, "Generate Report"],
             ["website", Globe, "Build Website"],
             ["analyze", TrendingUp, "Analyze Data"],
-          ].map(([key, Icon, label]) => (
+          ] as const).map(([key, Icon, label]) => (
             <Button
               key={key}
               variant="ghost"
-              className="w-full justify-start"
-              onClick={() => p.onQuickAction(key)}
+              className="w-full justify-start hover:bg-primary/10"
+              onClick={() => p.onQuickAction(key as string)}
+              data-testid={`button-quick-${key}`}
             >
               <Icon className="w-4 h-4 mr-2" />
               {label}
@@ -166,8 +168,8 @@ export function AgentWorkspace(p: Props) {
           </div>
 
           {/* CHAT */}
-          <TabsContent value="chat" className="flex-1 m-0">
-            <ScrollArea className="flex-1 p-6">
+          <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
+            <ScrollArea className="h-full p-6">
               <div className="space-y-4 max-w-4xl">
                 {p.messages.map((m) => {
                   const bg =
@@ -206,7 +208,7 @@ export function AgentWorkspace(p: Props) {
                         <p className="text-sm whitespace-pre-wrap">
                           {m.content}
                         </p>
-                        {m.steps?.length > 0 && (
+                        {m.steps && m.steps.length > 0 && (
                           <div className="mt-3 space-y-2">
                             {m.steps.map((s) => (
                               <div
@@ -257,8 +259,8 @@ export function AgentWorkspace(p: Props) {
           </TabsContent>
 
           {/* LOGS */}
-          <TabsContent value="logs" className="flex-1 m-0">
-            <ScrollArea className="flex-1 bg-slate-900 text-green-400 font-mono text-sm">
+          <TabsContent value="logs" className="flex-1 m-0 overflow-hidden">
+            <ScrollArea className="h-full bg-slate-900 text-green-400 font-mono text-sm">
               <div className="p-4 space-y-1">
                 {p.logs.map((l) => {
                   // ── guard: ensure ts is Date
@@ -289,8 +291,8 @@ export function AgentWorkspace(p: Props) {
           </TabsContent>
 
           {/* ARTIFACTS */}
-          <TabsContent value="artifacts" className="flex-1 m-0">
-            <ScrollArea className="flex-1 bg-gray-50">
+          <TabsContent value="artifacts" className="flex-1 m-0 overflow-hidden">
+            <ScrollArea className="h-full bg-gray-50">
               <div className="p-6">
                 {p.artifacts.length === 0 ? (
                   <div className="text-center py-12 text-slate-500">

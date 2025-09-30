@@ -23,8 +23,14 @@ const storedKeys = JSON.parse(
 export default function Home() {
   const { toast } = useToast();
 
-  // ---------- session ----------
-  const [sessionId] = useState(() => nanoid());
+  // ---------- session (persisted across reloads) ----------
+  const [sessionId] = useState(() => {
+    const stored = localStorage.getItem('agentdiaz-session-id');
+    if (stored) return stored;
+    const newId = nanoid();
+    localStorage.setItem('agentdiaz-session-id', newId);
+    return newId;
+  });
 
   // ---------- UI state ----------
   const [persona, setPersona] = useState<Persona>("professional");
@@ -50,11 +56,21 @@ export default function Home() {
     messages: wsMessages,
   } = useWebSocket(sessionId);
 
-  // ---------- local copy of user messages ----------
-  const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
+  // ---------- local copy of user messages with persistence ----------
+  const [userMessages, setUserMessages] = useState<ChatMessage[]>(() => {
+    const saved = localStorage.getItem(`agentdiaz-messages-${sessionId}`);
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  // merge WS messages (assistant) + local user messages for display
-  const allMessages = [...userMessages, ...wsMessages];
+  // merge WS messages (assistant) + local user messages and sort by timestamp
+  const allMessages = [...userMessages, ...wsMessages].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  // persist user messages
+  useEffect(() => {
+    localStorage.setItem(`agentdiaz-messages-${sessionId}`, JSON.stringify(userMessages));
+  }, [userMessages, sessionId]);
 
   // ---------- voice hook ----------
   const { isListening, isSupported, startListening, speak } = useVoice(
@@ -116,7 +132,38 @@ export default function Home() {
       analyze:
         "Analyze the provided data and create insights with charts and summaries",
     };
-    setChatInput(prompts[action] || "");
+    const prompt = prompts[action] || "";
+    if (prompt) {
+      setChatInput(prompt);
+      // Auto-send the message
+      setTimeout(() => {
+        if (prompt) {
+          setUserMessages((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              role: "user",
+              content: prompt,
+              timestamp: new Date(),
+              status: "completed",
+            },
+          ]);
+          sendMessage({
+            type: "chat",
+            data: {
+              sessionId,
+              content: prompt,
+              persona,
+              tone,
+              contentAgentEnabled,
+              apiKeys,
+            },
+          });
+          setChatInput("");
+          setActiveTab("chat");
+        }
+      }, 100);
+    }
   };
 
   const handleDownloadArtifact = (artifact: Artifact) =>

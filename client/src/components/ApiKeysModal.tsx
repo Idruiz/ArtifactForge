@@ -78,10 +78,10 @@ export function ApiKeysModal({ isOpen, onClose, apiKeys, onSave }: ApiKeysModalP
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} data-testid="button-cancel-keys">
             Cancel
           </Button>
-          <Button onClick={handleSave}>
+          <Button onClick={handleSave} data-testid="button-save-keys">
             Save Keys
           </Button>
         </DialogFooter>
