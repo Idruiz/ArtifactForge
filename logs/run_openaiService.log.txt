@@ -75,3 +75,5 @@
 [2025-09-30T18:57:20.823Z] [trace] chat model=gpt-5-mini max_completion_tokens=9000
 [2025-09-30T19:02:06.143Z] [trace] chat model=gpt-5-mini max_completion_tokens=9000
 [2025-09-30T19:02:22.811Z] [trace] chat model=gpt-5-mini max_completion_tokens=9000
+[2025-09-30T23:19:40.650Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-09-30T23:19:40.660Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
