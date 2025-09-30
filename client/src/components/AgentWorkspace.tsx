@@ -3,7 +3,6 @@ import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -169,7 +168,7 @@ export function AgentWorkspace(p: Props) {
 
           {/* CHAT */}
           <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
-            <div className="h-full overflow-y-auto overflow-x-hidden p-4 md:p-6" style={{ WebkitOverflowScrolling: "touch" }}>
+            <div className="h-full overflow-y-auto overflow-x-hidden p-4 md:p-6 scrollbar-visible" style={{ WebkitOverflowScrolling: "touch" }}>
               <div className="space-y-4 max-w-4xl">
                 {p.messages.map((m) => {
                   const bg =
@@ -259,7 +258,7 @@ export function AgentWorkspace(p: Props) {
 
           {/* LOGS */}
           <TabsContent value="logs" className="flex-1 m-0 overflow-hidden">
-            <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-900 text-green-400 font-mono text-xs md:text-sm" style={{ WebkitOverflowScrolling: "touch" }}>
+            <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-900 text-green-400 font-mono text-xs md:text-sm scrollbar-visible" style={{ WebkitOverflowScrolling: "touch" }}>
               <div className="p-4 space-y-1">
                 {p.logs.map((l) => {
                   // ── guard: ensure ts is Date
@@ -290,7 +289,7 @@ export function AgentWorkspace(p: Props) {
 
           {/* ARTIFACTS */}
           <TabsContent value="artifacts" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full bg-gray-50">
+            <div className="h-full overflow-y-auto overflow-x-hidden bg-gray-50 scrollbar-visible">
               <div className="p-6">
                 {p.artifacts.length === 0 ? (
                   <div className="text-center py-12 text-slate-500">
@@ -368,8 +367,7 @@ export function AgentWorkspace(p: Props) {
                   </div>
                 )}
               </div>
-              <ScrollBar orientation="vertical" />
-            </ScrollArea>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
