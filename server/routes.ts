@@ -21,9 +21,21 @@ interface WebSocketConnection extends WebSocket {
   isAlive?: boolean;
 }
 
-function safeJsonParse<T = any>(buf: Buffer | string): T | null {
+function safeJsonParse<T = any>(data: any): T | null {
   try {
-    return JSON.parse(typeof buf === "string" ? buf : buf.toString("utf8")) as T;
+    let str: string;
+    if (typeof data === "string") {
+      str = data;
+    } else if (Buffer.isBuffer(data)) {
+      str = data.toString("utf8");
+    } else if (data instanceof ArrayBuffer) {
+      str = Buffer.from(data).toString("utf8");
+    } else if (Array.isArray(data)) {
+      str = Buffer.concat(data).toString("utf8");
+    } else {
+      return null;
+    }
+    return JSON.parse(str) as T;
   } catch {
     return null;
   }
