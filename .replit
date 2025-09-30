@@ -10,5 +10,9 @@ channel = "stable-24_05"
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 35393
+externalPort = 3000
+
 [env]
 PORT = "5000"
