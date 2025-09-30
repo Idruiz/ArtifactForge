@@ -1,0 +1,14 @@
+[2025-07-23T02:10:03.074Z] [step_start] Starting: Planning content generation
+[2025-07-23T02:10:03.077Z] [trace] Generated 4 search queries
+[2025-07-23T02:10:03.078Z] [step_end] Completed: Planning content generation
+[2025-07-23T02:10:03.079Z] [step_start] Starting: Web research
+[2025-07-23T02:10:05.484Z] [trace] Found 4 search results across 4 queries
+[2025-07-23T02:10:05.485Z] [step_end] Completed: Web research
+[2025-07-23T02:10:05.486Z] [step_start] Starting: Generating content outline
+[2025-07-23T02:10:19.847Z] [trace] Generated outline with 10 slides
+[2025-07-23T02:10:19.848Z] [step_end] Completed: Generating content outline
+[2025-07-23T02:10:19.850Z] [step_start] Starting: Processing visual content
+[2025-07-23T02:10:22.696Z] [trace] Added 8 images and 5 charts
+[2025-07-23T02:10:22.704Z] [step_end] Completed: Processing visual content
+[2025-07-23T02:10:22.707Z] [step_start] Starting: Building presentation
+[2025-07-23T02:10:26.271Z] [trace] Error: pres.writeBuffer is not a function

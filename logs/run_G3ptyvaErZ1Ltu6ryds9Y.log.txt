@@ -1,0 +1,17 @@
+[2025-08-13T18:14:22.882Z] [step_start] Starting: Planning content generation
+[2025-08-13T18:14:22.886Z] [trace] Generated 4 search queries
+[2025-08-13T18:14:22.888Z] [step_end] Completed: Planning content generation
+[2025-08-13T18:14:22.889Z] [step_start] Starting: Web research
+[2025-08-13T18:14:24.135Z] [trace] Found 24 search results
+[2025-08-13T18:14:24.137Z] [step_end] Completed: Web research
+[2025-08-13T18:14:29.236Z] [step_start] Starting: Generating content outline
+[2025-08-13T18:15:45.580Z] [trace] Generated outline with 13 slides
+[2025-08-13T18:15:45.582Z] [step_end] Completed: Generating content outline
+[2025-08-13T18:15:45.592Z] [step_start] Starting: Processing visual content
+[2025-08-13T18:15:51.845Z] [trace] Visuals → images: 12, charts: 13
+[2025-08-13T18:15:51.846Z] [step_end] Completed: Processing visual content
+[2025-08-13T18:15:51.848Z] [step_start] Starting: Building PPTX
+[2025-08-13T18:15:51.849Z] [step_start] Starting: Building presentation
+[2025-08-13T18:15:58.063Z] [step_end] Completed: Building presentation
+[2025-08-13T18:15:58.065Z] [step_end] Completed: Building PPTX
+[2025-08-13T18:15:58.067Z] [delivery] ✅ Artifacts emitted: Teaching_in_2025_Data-Driven_Trends_Practical_Charts_and_an_Implementation_Roadmap_2025-08-13T18-15-57.pptx

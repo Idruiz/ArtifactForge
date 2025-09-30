@@ -1,0 +1,8 @@
+[2025-08-12T15:44:21.272Z] [step_start] Starting: Planning content generation
+[2025-08-12T15:44:21.276Z] [trace] Generated 4 search queries
+[2025-08-12T15:44:21.279Z] [step_end] Completed: Planning content generation
+[2025-08-12T15:44:21.280Z] [step_start] Starting: Web research
+[2025-08-12T15:44:21.529Z] [trace] Found 0 search results
+[2025-08-12T15:44:21.535Z] [step_end] Completed: Web research
+[2025-08-12T15:44:21.539Z] [step_start] Starting: Generating content outline
+[2025-08-12T15:44:24.483Z] [trace] Error: Structured generation failed: 400 Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.

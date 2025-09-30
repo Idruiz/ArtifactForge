@@ -1,0 +1,15 @@
+[2025-08-13T20:34:33.941Z] [step_start] Starting: Planning content generation
+[2025-08-13T20:34:33.944Z] [trace] Generated 4 search queries
+[2025-08-13T20:34:33.945Z] [step_end] Completed: Planning content generation
+[2025-08-13T20:34:33.947Z] [step_start] Starting: Web research
+[2025-08-13T20:34:35.319Z] [trace] Found 24 search results
+[2025-08-13T20:34:35.320Z] [step_end] Completed: Web research
+[2025-08-13T20:34:38.192Z] [step_start] Starting: Generating content outline
+[2025-08-13T20:35:35.437Z] [trace] Generated outline with 13 slides
+[2025-08-13T20:35:35.439Z] [step_end] Completed: Generating content outline
+[2025-08-13T20:35:35.449Z] [step_start] Starting: Processing visual content
+[2025-08-13T20:35:41.229Z] [trace] Visuals → images: 13, charts: 5
+[2025-08-13T20:35:41.231Z] [step_end] Completed: Processing visual content
+[2025-08-13T20:35:41.233Z] [step_start] Starting: Building PPTX
+[2025-08-13T20:35:41.234Z] [step_start] Starting: Building presentation
+[2025-08-13T20:35:41.237Z] [trace] Build failed for pptx: seedSlideChartSpec is not defined

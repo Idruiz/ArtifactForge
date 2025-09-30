@@ -1,0 +1,8 @@
+[2025-08-12T16:04:51.596Z] [step_start] Starting: Planning content generation
+[2025-08-12T16:04:51.599Z] [trace] Generated 4 search queries
+[2025-08-12T16:04:51.601Z] [step_end] Completed: Planning content generation
+[2025-08-12T16:04:51.602Z] [step_start] Starting: Web research
+[2025-08-12T16:04:51.815Z] [trace] Found 0 search results
+[2025-08-12T16:04:51.816Z] [step_end] Completed: Web research
+[2025-08-12T16:04:51.817Z] [step_start] Starting: Generating content outline
+[2025-08-12T16:04:53.002Z] [trace] Error: 400 Invalid schema for function 'RichOutline': In context=('properties', 'slides', 'items', 'properties', 'chartSpec', 'properties', 'data', 'type', '1'), array schema missing items.

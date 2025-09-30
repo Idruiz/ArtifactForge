@@ -1,0 +1,15 @@
+[2025-07-23T02:33:38.195Z] [step_start] Starting: Planning content generation
+[2025-07-23T02:33:38.197Z] [trace] Generated 4 search queries
+[2025-07-23T02:33:38.198Z] [step_end] Completed: Planning content generation
+[2025-07-23T02:33:38.200Z] [step_start] Starting: Web research
+[2025-07-23T02:33:40.677Z] [trace] Found 4 search results across 4 queries
+[2025-07-23T02:33:40.679Z] [step_end] Completed: Web research
+[2025-07-23T02:33:40.680Z] [step_start] Starting: Generating content outline
+[2025-07-23T02:33:51.192Z] [trace] Generated outline with 10 slides
+[2025-07-23T02:33:51.196Z] [step_end] Completed: Generating content outline
+[2025-07-23T02:33:51.201Z] [step_start] Starting: Processing visual content
+[2025-07-23T02:33:54.153Z] [trace] Added 9 images and 5 charts
+[2025-07-23T02:33:54.154Z] [step_end] Completed: Processing visual content
+[2025-07-23T02:33:54.156Z] [step_start] Starting: Building presentation
+[2025-07-23T02:33:56.993Z] [step_end] Completed: Building presentation
+[2025-07-23T02:33:56.994Z] [delivery] ✅ Artifacts emitted: Pharmacy_Best_Practices_in_Canada_in_2025_2025-07-23T02-33-56.pptx

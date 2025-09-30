@@ -1,0 +1,2 @@
+[2025-08-12T15:55:04.624Z] [step_start] Starting: Generating chat response
+[2025-08-12T15:55:06.236Z] [trace] Error: 400 Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.

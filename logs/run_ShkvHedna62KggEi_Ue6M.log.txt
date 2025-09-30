@@ -1,0 +1,17 @@
+[2025-08-13T19:17:51.504Z] [step_start] Starting: Planning content generation
+[2025-08-13T19:17:51.509Z] [trace] Generated 4 search queries
+[2025-08-13T19:17:51.510Z] [step_end] Completed: Planning content generation
+[2025-08-13T19:17:51.512Z] [step_start] Starting: Web research
+[2025-08-13T19:17:52.970Z] [trace] Found 24 search results
+[2025-08-13T19:17:52.972Z] [step_end] Completed: Web research
+[2025-08-13T19:17:56.224Z] [step_start] Starting: Generating content outline
+[2025-08-13T19:18:47.767Z] [trace] Generated outline with 13 slides
+[2025-08-13T19:18:47.769Z] [step_end] Completed: Generating content outline
+[2025-08-13T19:18:47.776Z] [step_start] Starting: Processing visual content
+[2025-08-13T19:18:53.430Z] [trace] Visuals → images: 12, charts: 5
+[2025-08-13T19:18:53.432Z] [step_end] Completed: Processing visual content
+[2025-08-13T19:18:53.433Z] [step_start] Starting: Building PPTX
+[2025-08-13T19:18:53.434Z] [step_start] Starting: Building presentation
+[2025-08-13T19:18:58.563Z] [step_end] Completed: Building presentation
+[2025-08-13T19:18:58.565Z] [step_end] Completed: Building PPTX
+[2025-08-13T19:18:58.566Z] [delivery] ✅ Artifacts emitted: Best_Practices_in_Pharmacy_Canada_2025_Technology_Operations_and_Trends_2025-08-13T19-18-58.pptx

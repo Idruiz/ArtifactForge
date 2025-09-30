@@ -1,0 +1,14 @@
+[2025-07-23T04:29:12.301Z] [step_start] Starting: Planning content generation
+[2025-07-23T04:29:12.304Z] [trace] Generated 4 search queries
+[2025-07-23T04:29:12.306Z] [step_end] Completed: Planning content generation
+[2025-07-23T04:29:12.307Z] [step_start] Starting: Web research
+[2025-07-23T04:29:14.768Z] [trace] Found 4 search results across 4 queries
+[2025-07-23T04:29:14.770Z] [step_end] Completed: Web research
+[2025-07-23T04:29:14.771Z] [step_start] Starting: Generating content outline
+[2025-07-23T04:30:00.965Z] [trace] Generated outline with 11 slides
+[2025-07-23T04:30:00.967Z] [step_end] Completed: Generating content outline
+[2025-07-23T04:30:00.969Z] [step_start] Starting: Processing visual content
+[2025-07-23T04:30:02.897Z] [trace] Added 0 images and 5 charts
+[2025-07-23T04:30:02.898Z] [step_end] Completed: Processing visual content
+[2025-07-23T04:30:02.900Z] [step_start] Starting: Building presentation
+[2025-07-23T04:30:03.841Z] [trace] Error: Presentation validation failed: Insufficient images: 0 (minimum 5 required), File size too small: 199905 bytes (minimum 200KB required)

@@ -1,0 +1,17 @@
+[2025-08-13T23:51:57.658Z] [step_start] Starting: Planning content generation
+[2025-08-13T23:51:57.664Z] [trace] Generated 4 search queries
+[2025-08-13T23:51:57.668Z] [step_end] Completed: Planning content generation
+[2025-08-13T23:51:57.670Z] [step_start] Starting: Web research
+[2025-08-13T23:51:58.903Z] [trace] Found 24 search results
+[2025-08-13T23:51:58.905Z] [step_end] Completed: Web research
+[2025-08-13T23:52:00.253Z] [step_start] Starting: Generating content outline
+[2025-08-13T23:53:21.929Z] [trace] Generated outline with 12 slides
+[2025-08-13T23:53:21.937Z] [step_end] Completed: Generating content outline
+[2025-08-13T23:53:21.965Z] [step_start] Starting: Processing visual content
+[2025-08-13T23:53:29.672Z] [trace] Visuals → images: 7, charts: 5
+[2025-08-13T23:53:29.674Z] [step_end] Completed: Processing visual content
+[2025-08-13T23:53:29.676Z] [step_start] Starting: Building PPTX
+[2025-08-13T23:53:29.677Z] [step_start] Starting: Building presentation
+[2025-08-13T23:53:32.458Z] [step_end] Completed: Building presentation
+[2025-08-13T23:53:32.462Z] [step_end] Completed: Building PPTX
+[2025-08-13T23:53:32.470Z] [delivery] ✅ Artifacts emitted: Best_Practices_in_Pharmacy_Data-Driven_Strategies_for_2025_2025-08-13T23-53-32.pptx

@@ -1,0 +1,8 @@
+[2025-08-12T21:08:55.286Z] [step_start] Starting: Planning content generation
+[2025-08-12T21:08:55.290Z] [trace] Generated 4 search queries
+[2025-08-12T21:08:55.291Z] [step_end] Completed: Planning content generation
+[2025-08-12T21:08:55.293Z] [step_start] Starting: Web research
+[2025-08-12T21:08:56.577Z] [trace] Found 24 search results
+[2025-08-12T21:08:56.579Z] [step_end] Completed: Web research
+[2025-08-12T21:09:00.194Z] [step_start] Starting: Generating content outline
+[2025-08-12T21:09:00.635Z] [trace] Error: 400 Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.

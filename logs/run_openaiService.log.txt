@@ -1,0 +1,52 @@
+[2025-08-12T07:19:28.244Z] [trace] structured attempt 1 failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T07:19:28.576Z] [trace] structured attempt 2 failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T07:19:28.874Z] [trace] structured attempt 3 failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T15:37:01.359Z] [trace] structured attempt 1 failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T15:37:02.698Z] [trace] structured attempt 2 failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T15:37:02.777Z] [trace] structured attempt 3 failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T15:44:22.100Z] [trace] structured attempt 1 responses(text.format) failed: 400 Missing required parameter: 'text.format.name'.
+[2025-08-12T15:44:22.416Z] [trace] structured attempt 1 responses(response_format) failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T15:44:22.530Z] [trace] structured attempt 2 responses(text.format) failed: 400 Missing required parameter: 'text.format.name'.
+[2025-08-12T15:44:22.619Z] [trace] structured attempt 2 responses(response_format) failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T15:44:22.711Z] [trace] structured attempt 3 responses(text.format) failed: 400 Missing required parameter: 'text.format.name'.
+[2025-08-12T15:44:22.799Z] [trace] structured attempt 3 responses(response_format) failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T15:55:05.564Z] [trace] responses.create failed -> fallback. 400 Unsupported parameter: 'temperature' is not supported with this model.
+[2025-08-12T15:57:06.936Z] [trace] structured attempt 1 text.format failed: 400 Unknown parameter: 'text.json_schema'.
+[2025-08-12T15:57:08.250Z] [trace] structured attempt 1 legacy response_format failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T15:57:08.367Z] [trace] structured attempt 2 text.format failed: 400 Unknown parameter: 'text.json_schema'.
+[2025-08-12T15:57:08.471Z] [trace] structured attempt 2 legacy response_format failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T15:57:08.559Z] [trace] structured attempt 3 text.format failed: 400 Unknown parameter: 'text.json_schema'.
+[2025-08-12T15:57:08.684Z] [trace] structured attempt 3 legacy response_format failed: 400 Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'. Try again with the new parameter. See the API documentation for more information: https://platform.openai.com/docs/api-reference/responses/create.
+[2025-08-12T16:04:52.329Z] [trace] chat.create failed (modern params): 400 Invalid schema for function 'RichOutline': In context=('properties', 'slides', 'items', 'properties', 'chartSpec', 'properties', 'data', 'type', '1'), array schema missing items.
+[2025-08-12T16:04:52.819Z] [trace] retry w/ max_tokens failed: 400 Invalid schema for function 'RichOutline': In context=('properties', 'slides', 'items', 'properties', 'chartSpec', 'properties', 'data', 'type', '1'), array schema missing items.
+[2025-08-12T16:09:55.350Z] [trace] chat.create failed (modern params): 400 Unsupported value: 'temperature' does not support 0.4 with this model. Only the default (1) value is supported.
+[2025-08-12T16:09:55.490Z] [trace] retry w/ max_tokens failed: 400 Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.
+[2025-08-12T21:09:00.196Z] [trace] minSources=1
+[2025-08-13T16:01:35.208Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T16:01:35.215Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T17:00:44.417Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T17:00:44.428Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T17:44:41.025Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T17:44:41.028Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T18:14:29.238Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T18:14:29.240Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T18:17:32.703Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T18:17:32.705Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T18:47:34.404Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T18:47:34.406Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T19:17:56.226Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T19:17:56.228Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T20:34:38.194Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T20:34:38.197Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T20:42:10.382Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T20:42:10.383Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T21:22:45.156Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T21:22:45.160Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T22:59:12.610Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T22:59:12.612Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T23:47:51.999Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T23:47:52.002Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-08-13T23:52:00.256Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-08-13T23:52:00.259Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000
+[2025-09-30T16:17:17.266Z] [trace] outline model=gpt-5-mini minSources=1
+[2025-09-30T16:17:17.268Z] [trace] tool_call model=gpt-5-mini tool=RichOutline max_completion_tokens=9000

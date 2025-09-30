@@ -1,0 +1,14 @@
+modules = ["nodejs-20"]
+
+run = "npm run dev"
+hidden = [".config", ".git", "node_modules", "dist"]
+
+[nix]
+channel = "stable-24_05"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[env]
+PORT = "5000"

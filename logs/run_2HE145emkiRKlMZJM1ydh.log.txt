@@ -1,0 +1,17 @@
+[2025-08-13T21:22:40.650Z] [step_start] Starting: Planning content generation
+[2025-08-13T21:22:40.652Z] [trace] Generated 4 search queries
+[2025-08-13T21:22:40.655Z] [step_end] Completed: Planning content generation
+[2025-08-13T21:22:40.656Z] [step_start] Starting: Web research
+[2025-08-13T21:22:41.906Z] [trace] Found 24 search results
+[2025-08-13T21:22:41.908Z] [step_end] Completed: Web research
+[2025-08-13T21:22:45.154Z] [step_start] Starting: Generating content outline
+[2025-08-13T21:23:55.867Z] [trace] Generated outline with 13 slides
+[2025-08-13T21:23:55.869Z] [step_end] Completed: Generating content outline
+[2025-08-13T21:23:55.879Z] [step_start] Starting: Processing visual content
+[2025-08-13T21:24:02.106Z] [trace] Visuals → images: 12, charts: 9
+[2025-08-13T21:24:02.108Z] [step_end] Completed: Processing visual content
+[2025-08-13T21:24:02.109Z] [step_start] Starting: Building PPTX
+[2025-08-13T21:24:02.110Z] [step_start] Starting: Building presentation
+[2025-08-13T21:24:08.944Z] [step_end] Completed: Building presentation
+[2025-08-13T21:24:08.945Z] [step_end] Completed: Building PPTX
+[2025-08-13T21:24:08.946Z] [delivery] ✅ Artifacts emitted: Best_Pharmacy_Practices_2025_Strategy_Operations_and_Compliance_2025-08-13T21-24-08.pptx

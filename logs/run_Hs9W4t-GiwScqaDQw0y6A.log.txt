@@ -1,0 +1,15 @@
+[2025-08-12T06:32:30.840Z] [step_start] Starting: Planning content generation
+[2025-08-12T06:32:30.843Z] [trace] Generated 4 search queries
+[2025-08-12T06:32:30.844Z] [step_end] Completed: Planning content generation
+[2025-08-12T06:32:30.848Z] [step_start] Starting: Web research
+[2025-08-12T06:32:31.045Z] [trace] Found 0 search results
+[2025-08-12T06:32:31.046Z] [step_end] Completed: Web research
+[2025-08-12T06:32:31.051Z] [step_start] Starting: Generating content outline
+[2025-08-12T06:32:51.700Z] [trace] Generated outline with 10 slides
+[2025-08-12T06:32:51.702Z] [step_end] Completed: Generating content outline
+[2025-08-12T06:32:51.704Z] [step_start] Starting: Processing visual content
+[2025-08-12T06:32:55.888Z] [trace] Added 5 images and 5 charts
+[2025-08-12T06:32:55.890Z] [step_end] Completed: Processing visual content
+[2025-08-12T06:32:55.892Z] [step_start] Starting: Building presentation
+[2025-08-12T06:32:59.535Z] [step_end] Completed: Building presentation
+[2025-08-12T06:32:59.537Z] [delivery] ✅ Artifacts emitted: Best_Pharmacy_Practices_in_2025_Trends_and_Innovations_2025-08-12T06-32-59.pptx

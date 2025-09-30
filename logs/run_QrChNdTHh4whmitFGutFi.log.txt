@@ -1,0 +1,8 @@
+[2025-08-12T20:33:59.714Z] [step_start] Starting: Planning content generation
+[2025-08-12T20:33:59.717Z] [trace] Generated 4 search queries
+[2025-08-12T20:33:59.719Z] [step_end] Completed: Planning content generation
+[2025-08-12T20:33:59.720Z] [step_start] Starting: Web research
+[2025-08-12T20:34:00.983Z] [trace] Found 24 search results
+[2025-08-12T20:34:00.984Z] [step_end] Completed: Web research
+[2025-08-12T20:34:05.156Z] [step_start] Starting: Generating content outline
+[2025-08-12T20:35:10.329Z] [trace] Error: Outline validation failed: need >= 8 sources

@@ -1,0 +1,14 @@
+[2025-07-23T00:12:52.106Z] [step_start] Starting: Planning content generation
+[2025-07-23T00:12:52.108Z] [trace] Generated 4 search queries
+[2025-07-23T00:12:52.110Z] [step_end] Completed: Planning content generation
+[2025-07-23T00:12:52.111Z] [step_start] Starting: Web research
+[2025-07-23T00:12:54.548Z] [trace] Found 4 search results across 4 queries
+[2025-07-23T00:12:54.549Z] [step_end] Completed: Web research
+[2025-07-23T00:12:54.550Z] [step_start] Starting: Generating content outline
+[2025-07-23T00:13:09.792Z] [trace] Generated outline with 10 slides
+[2025-07-23T00:13:09.793Z] [step_end] Completed: Generating content outline
+[2025-07-23T00:13:09.794Z] [step_start] Starting: Processing visual content
+[2025-07-23T00:13:12.903Z] [trace] Added 8 images and 5 charts
+[2025-07-23T00:13:12.908Z] [step_end] Completed: Processing visual content
+[2025-07-23T00:13:12.910Z] [step_start] Starting: Building presentation
+[2025-07-23T00:13:13.621Z] [trace] Error: Presentation validation failed: File size too small: 17 bytes (minimum 200KB required)

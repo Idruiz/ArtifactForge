@@ -1,0 +1,14 @@
+[2025-07-22T23:17:53.784Z] [step_start] Starting: Planning content generation
+[2025-07-22T23:17:53.785Z] [trace] Generated 4 search queries
+[2025-07-22T23:17:53.786Z] [step_end] Completed: Planning content generation
+[2025-07-22T23:17:53.787Z] [step_start] Starting: Web research
+[2025-07-22T23:17:56.201Z] [trace] Found 4 search results across 4 queries
+[2025-07-22T23:17:56.202Z] [step_end] Completed: Web research
+[2025-07-22T23:17:56.202Z] [step_start] Starting: Generating content outline
+[2025-07-22T23:18:08.399Z] [trace] Generated outline with 10 slides
+[2025-07-22T23:18:08.400Z] [step_end] Completed: Generating content outline
+[2025-07-22T23:18:08.401Z] [step_start] Starting: Processing visual content
+[2025-07-22T23:18:09.339Z] [trace] Added 7 images and 2 charts
+[2025-07-22T23:18:09.339Z] [step_end] Completed: Processing visual content
+[2025-07-22T23:18:09.340Z] [step_start] Starting: Building presentation
+[2025-07-22T23:18:09.971Z] [trace] Error: Presentation validation failed: Insufficient charts: 2 (minimum 5 required), File size too small: 17 bytes (minimum 200KB required)
