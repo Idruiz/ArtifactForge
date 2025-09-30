@@ -25,6 +25,7 @@ interface AgentTask {
   status: AgentStatus;
   progress: number;      // 0–100
   currentStep: string;   // human-readable
+  conversationHistory?: any[]; // for context retention
 }
 
 type BuilderFormat =
@@ -62,6 +63,7 @@ class AgentService {
     tone: string,
     apiKeys: any,
     contentAgentEnabled: boolean,
+    conversationHistory: any[] = [],
   ): Promise<string> {
     const taskId = nanoid();
     const task: AgentTask = {
@@ -74,6 +76,7 @@ class AgentService {
       status: "processing",
       progress: 0,
       currentStep: "Initializing",
+      conversationHistory,
     };
 
     this.activeTasks.set(taskId, task);
@@ -125,10 +128,19 @@ class AgentService {
     this.updateStatus(task.sessionId, task);
 
     await logger.stepStart(task.id, "Generating chat response");
+    
+    // Build context from conversation history
+    const history = task.conversationHistory || [];
+    const contextMessages = history
+      .filter((m: any) => m.role && m.content)
+      .map((m: any) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+      .join("\n\n");
+    
     const response = await openaiService.generateChatReply(
       task.prompt,
       task.persona,
       task.tone,
+      contextMessages ? `Previous conversation:\n${contextMessages}` : undefined,
     );
     await logger.stepEnd(task.id, "Generating chat response");
 

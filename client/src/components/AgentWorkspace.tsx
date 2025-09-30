@@ -70,22 +70,34 @@ export function AgentWorkspace(p: Props) {
       }) as Record<string, string>
     )[type.toLowerCase()] || "📁";
 
-  /* ─── auto‑scroll to latest message / log ─── */
+  /* ─── conditional auto‑scroll (only if user near bottom) ─── */
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const logScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollEl = chatScrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (!scrollEl) return;
+    const isNearBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 100;
+    if (isNearBottom) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [p.messages]);
 
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollEl = logScrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (!scrollEl) return;
+    const isNearBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 100;
+    if (isNearBottom) {
+      logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [p.logs]);
 
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* ───────── left panel ───────── */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div className="hidden md:flex w-80 bg-white border-r border-gray-200 flex-col">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">
             Agent Status
@@ -169,7 +181,7 @@ export function AgentWorkspace(p: Props) {
 
           {/* CHAT */}
           <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full p-6">
+            <ScrollArea className="h-full p-4 md:p-6" ref={chatScrollRef}>
               <div className="space-y-4 max-w-4xl">
                 {p.messages.map((m) => {
                   const bg =
@@ -182,7 +194,7 @@ export function AgentWorkspace(p: Props) {
                       className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-xs lg:max-w-2xl px-4 py-3 rounded-lg ${bg}`}
+                        className={`max-w-[85%] md:max-w-xs lg:max-w-2xl px-4 py-3 rounded-lg ${bg}`}
                       >
                         {m.role === "assistant" && (
                           <div className="flex items-center space-x-2 mb-2">
@@ -260,7 +272,7 @@ export function AgentWorkspace(p: Props) {
 
           {/* LOGS */}
           <TabsContent value="logs" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full bg-slate-900 text-green-400 font-mono text-sm">
+            <ScrollArea className="h-full bg-slate-900 text-green-400 font-mono text-xs md:text-sm" ref={logScrollRef}>
               <div className="p-4 space-y-1">
                 {p.logs.map((l) => {
                   // ── guard: ensure ts is Date

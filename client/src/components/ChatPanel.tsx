@@ -54,34 +54,40 @@ export function ChatPanel({
 
   return (
     <div className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 py-4">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
         {/* Header Row */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between mb-3 md:mb-4">
+          <div className="flex items-center space-x-2 md:space-x-3">
+            <div className="w-7 h-7 md:w-8 md:h-8 bg-primary rounded-lg flex items-center justify-center">
+              <Zap className="w-4 h-4 md:w-5 md:h-5 text-white" />
             </div>
-            <h1 className="text-xl font-semibold text-slate-900">Agent Diaz</h1>
+            <h1 className="text-lg md:text-xl font-semibold text-slate-900">Agent Diaz</h1>
             <Badge variant={isConnected ? "default" : "destructive"}>
               {isConnected ? "Online" : "Offline"}
             </Badge>
           </div>
           
-          <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="sm" onClick={onShowApiKeys} data-testid="button-api-keys">
+          <div className="flex items-center space-x-1 md:space-x-3">
+            <Button variant="ghost" size="sm" onClick={onShowApiKeys} data-testid="button-api-keys" className="hidden md:flex">
               <Key className="w-4 h-4 mr-2" />
               API Keys
             </Button>
+            <Button variant="ghost" size="sm" onClick={onShowApiKeys} data-testid="button-api-keys-mobile" className="md:hidden">
+              <Key className="w-4 h-4" />
+            </Button>
             
-            <Button variant="ghost" size="sm" onClick={onRestartAgent} data-testid="button-restart">
+            <Button variant="ghost" size="sm" onClick={onRestartAgent} data-testid="button-restart" className="hidden md:flex">
               <RotateCcw className="w-4 h-4 mr-2" />
               Restart
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onRestartAgent} data-testid="button-restart-mobile" className="md:hidden">
+              <RotateCcw className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
         {/* Controls Row */}
-        <div className="flex items-center space-x-6 mb-4">
+        <div className="flex flex-wrap items-center gap-3 md:gap-6 mb-3 md:mb-4">
           {/* Persona Selection */}
           <div className="flex items-center space-x-2">
             <Label className="text-sm font-medium">Persona:</Label>

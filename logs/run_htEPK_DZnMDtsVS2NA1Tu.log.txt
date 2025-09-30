@@ -1,0 +1,17 @@
+[2025-09-30T17:57:57.189Z] [step_start] Starting: Planning content generation
+[2025-09-30T17:57:57.191Z] [trace] Generated 4 search queries
+[2025-09-30T17:57:57.192Z] [step_end] Completed: Planning content generation
+[2025-09-30T17:57:57.193Z] [step_start] Starting: Web research
+[2025-09-30T17:57:58.582Z] [trace] Found 24 search results
+[2025-09-30T17:57:58.584Z] [step_end] Completed: Web research
+[2025-09-30T17:57:59.811Z] [step_start] Starting: Generating content outline
+[2025-09-30T17:59:00.477Z] [trace] Generated outline with 10 slides
+[2025-09-30T17:59:00.478Z] [step_end] Completed: Generating content outline
+[2025-09-30T17:59:00.483Z] [step_start] Starting: Processing visual content
+[2025-09-30T17:59:03.619Z] [trace] Visuals → images: 10, charts: 1
+[2025-09-30T17:59:03.620Z] [step_end] Completed: Processing visual content
+[2025-09-30T17:59:03.621Z] [step_start] Starting: Building PPTX
+[2025-09-30T17:59:03.623Z] [step_start] Starting: Building presentation
+[2025-09-30T17:59:06.995Z] [step_end] Completed: Building presentation
+[2025-09-30T17:59:06.997Z] [step_end] Completed: Building PPTX
+[2025-09-30T17:59:06.998Z] [delivery] ✅ Artifacts emitted: Ants_Biology_Behavior_and_Ecological_Importance_A_10-Slide_Overview_2025-09-30T17-59-06.pptx

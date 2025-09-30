@@ -105,7 +105,7 @@ export default function Home() {
       },
     ]);
 
-    // send to server
+    // send to server with conversation history for context
     sendMessage({
       type: "chat",
       data: {
@@ -115,6 +115,7 @@ export default function Home() {
         tone,
         contentAgentEnabled,
         apiKeys,
+        conversationHistory: allMessages.slice(-10), // last 10 messages for context
       },
     });
 
@@ -157,6 +158,7 @@ export default function Home() {
               tone,
               contentAgentEnabled,
               apiKeys,
+              conversationHistory: allMessages.slice(-10),
             },
           });
           setChatInput("");

@@ -92,7 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           case "chat": {
-            const { sessionId, content, persona, tone, contentAgentEnabled, apiKeys } = msg.data || {};
+            const { sessionId, content, persona, tone, contentAgentEnabled, apiKeys, conversationHistory } = msg.data || {};
             
             // Use environment variable as fallback if no API key provided
             const effectiveKeys = {
@@ -113,6 +113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               tone,
               effectiveKeys,
               !!contentAgentEnabled,
+              conversationHistory || [],
             );
             break;
           }
