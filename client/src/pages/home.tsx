@@ -17,7 +17,7 @@ import { nanoid } from "nanoid";
 
 // ---------- persist keys between reloads ----------
 const storedKeys = JSON.parse(
-  localStorage.getItem("agentfire-api-keys") || "{}",
+  localStorage.getItem("agentdiaz-api-keys") || "{}",
 ) as Partial<ApiKeys>;
 
 export default function Home() {
@@ -135,7 +135,7 @@ export default function Home() {
 
   const handleSaveApiKeys = (keys: ApiKeys) => {
     setApiKeys(keys);
-    localStorage.setItem("agentfire-api-keys", JSON.stringify(keys));
+    localStorage.setItem("agentdiaz-api-keys", JSON.stringify(keys));
 
     sendMessage({
       type: "updateKeys",

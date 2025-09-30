@@ -94,7 +94,7 @@ class SearcherService {
       params: { q: query, kl: "us-en" },
       timeout: 12000,
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; AgentFire/1.0)",
+        "User-Agent": "Mozilla/5.0 (compatible; Agent Diaz/1.0)",
         Accept: "text/html,application/xhtml+xml,application/xml",
       },
     });
@@ -181,7 +181,7 @@ class SearcherService {
       const r = await axios.get(url, {
         timeout: 12000,
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; AgentFire/1.0)",
+          "User-Agent": "Mozilla/5.0 (compatible; Agent Diaz/1.0)",
           Accept: "text/html,application/xhtml+xml",
         },
         maxContentLength: 2 * 1024 * 1024,

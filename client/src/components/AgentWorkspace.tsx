@@ -188,7 +188,7 @@ export function AgentWorkspace(p: Props) {
                               <span className="text-xs text-white">AI</span>
                             </div>
                             <span className="text-sm font-medium">
-                              AgentFire
+                              Agent Diaz
                             </span>
                             {m.status && (
                               <Badge

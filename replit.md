@@ -1,8 +1,8 @@
-# AgentFire - Autonomous AI Agent for Content Generation
+# Agent Diaz - Autonomous AI Agent for Content Generation
 
 ## Overview
 
-AgentFire is a sophisticated autonomous AI agent that generates professional presentations and reports from natural language prompts. The application features a real-time chat interface with AI personas, voice capabilities, and produces downloadable artifacts in multiple formats (PPTX, PDF, HTML). This is a full-stack application built with Node.js/Express backend and React frontend, designed to replace a Firebase Studio AI agent with improved reliability and delivery capabilities.
+Agent Diaz is a sophisticated autonomous AI agent that generates professional presentations and reports from natural language prompts. The application features a real-time chat interface with AI personas, voice capabilities, and produces downloadable artifacts in multiple formats (PPTX, PDF, HTML). This is a full-stack application built with Node.js/Express backend and React frontend, designed to replace a Firebase Studio AI agent with improved reliability and delivery capabilities.
 
 ## User Preferences
 
