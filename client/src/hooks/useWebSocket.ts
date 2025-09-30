@@ -23,14 +23,8 @@ export function useWebSocket(sessionId: string): UseWebSocketReturn {
     progress: 0,
     isProcessing: false,
   });
-  const [artifacts, setArtifacts] = useState<Artifact[]>(() => {
-    const saved = localStorage.getItem(`agentdiaz-artifacts-${sessionId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem(`agentdiaz-ws-messages-${sessionId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -100,15 +94,6 @@ export function useWebSocket(sessionId: string): UseWebSocketReturn {
       ws.close();
     };
   }, [sessionId]);
-
-  // Persist messages and artifacts
-  useEffect(() => {
-    localStorage.setItem(`agentdiaz-ws-messages-${sessionId}`, JSON.stringify(messages));
-  }, [messages, sessionId]);
-
-  useEffect(() => {
-    localStorage.setItem(`agentdiaz-artifacts-${sessionId}`, JSON.stringify(artifacts));
-  }, [artifacts, sessionId]);
 
   return {
     isConnected,

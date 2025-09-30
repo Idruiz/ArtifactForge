@@ -70,35 +70,16 @@ export function AgentWorkspace(p: Props) {
       }) as Record<string, string>
     )[type.toLowerCase()] || "📁";
 
-  /* ─── conditional auto-scroll (mobile-compatible) ─── */
+  /* ─── auto-scroll ─── */
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    requestAnimationFrame(() => {
-      const container = chatContainerRef.current;
-      if (!container) return;
-      
-      // Check if user is near bottom (within 150px)
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-      if (isNearBottom) {
-        chatEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
-      }
-    });
+    chatEndRef.current?.scrollIntoView({ behavior: "instant" as any });
   }, [p.messages]);
 
   useEffect(() => {
-    requestAnimationFrame(() => {
-      const container = logContainerRef.current;
-      if (!container) return;
-      
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-      if (isNearBottom) {
-        logEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
-      }
-    });
+    logEndRef.current?.scrollIntoView({ behavior: "instant" as any });
   }, [p.logs]);
 
   return (
@@ -188,7 +169,7 @@ export function AgentWorkspace(p: Props) {
 
           {/* CHAT */}
           <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
-            <div ref={chatContainerRef} className="h-full overflow-y-auto p-4 md:p-6" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
+            <div className="h-full overflow-y-auto overflow-x-hidden p-4 md:p-6" style={{ WebkitOverflowScrolling: "touch" }}>
               <div className="space-y-4 max-w-4xl">
                 {p.messages.map((m) => {
                   const bg =
@@ -278,7 +259,7 @@ export function AgentWorkspace(p: Props) {
 
           {/* LOGS */}
           <TabsContent value="logs" className="flex-1 m-0 overflow-hidden">
-            <div ref={logContainerRef} className="h-full overflow-y-auto bg-slate-900 text-green-400 font-mono text-xs md:text-sm" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
+            <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-900 text-green-400 font-mono text-xs md:text-sm" style={{ WebkitOverflowScrolling: "touch" }}>
               <div className="p-4 space-y-1">
                 {p.logs.map((l) => {
                   // ── guard: ensure ts is Date

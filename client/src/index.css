@@ -55,16 +55,12 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    overflow: hidden;
   }
   
-  /* Mobile scroll optimization */
-  [data-radix-scroll-area-viewport] {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-  }
-  
-  /* Improve mobile touch performance */
+  /* Optimize scrolling */
   * {
     -webkit-tap-highlight-color: transparent;
+    scroll-behavior: auto !important;
   }
 }

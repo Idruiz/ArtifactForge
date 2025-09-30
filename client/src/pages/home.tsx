@@ -23,10 +23,8 @@ const storedKeys = JSON.parse(
 export default function Home() {
   const { toast } = useToast();
 
-  // ---------- session (persisted across reloads) ----------
+  // ---------- session (always fresh) ----------
   const [sessionId] = useState(() => {
-    const stored = localStorage.getItem('agentdiaz-session-id');
-    if (stored) return stored;
     const newId = nanoid();
     localStorage.setItem('agentdiaz-session-id', newId);
     return newId;
@@ -56,21 +54,13 @@ export default function Home() {
     messages: wsMessages,
   } = useWebSocket(sessionId);
 
-  // ---------- local copy of user messages with persistence ----------
-  const [userMessages, setUserMessages] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem(`agentdiaz-messages-${sessionId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  // ---------- local copy of user messages (no persistence) ----------
+  const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
 
   // merge WS messages (assistant) + local user messages and sort by timestamp
   const allMessages = [...userMessages, ...wsMessages].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
-
-  // persist user messages
-  useEffect(() => {
-    localStorage.setItem(`agentdiaz-messages-${sessionId}`, JSON.stringify(userMessages));
-  }, [userMessages, sessionId]);
 
   // ---------- voice hook ----------
   const { isListening, isSupported, startListening, speak } = useVoice(
