@@ -41,9 +41,9 @@ interface Props {
 }
 
 export function AgentWorkspace(p: Props) {
-  /* ─── utilities ─── */
+  /* --- utilities --- */
   const fmtSize = (b: number) => {
-    if (!b) return "0 Bytes";
+    if (!b) return "0 Bytes";
     const k = 1024;
     const i = Math.floor(Math.log(b) / Math.log(k));
     return (b / Math.pow(k, i)).toFixed(1) + " " + ["B", "KB", "MB", "GB"][i];
@@ -69,7 +69,7 @@ export function AgentWorkspace(p: Props) {
       }) as Record<string, string>
     )[type.toLowerCase()] || "📁";
 
-  /* ─── auto-scroll only when near bottom ─── */
+  /* --- auto-scroll only when near bottom --- */
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -96,61 +96,52 @@ export function AgentWorkspace(p: Props) {
   }, [p.logs]);
 
   return (
-    <div className="flex-1 flex overflow-hidden w-full">
-      {/* ───────── left panel ───────── */}
-      <div className="w-64 lg:w-80 bg-white border-r border-gray-200 flex flex-col shrink-0">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">
-            Agent Status
-          </h2>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-sm text-slate-600">Current Task</span>
-              <Badge
-                variant={p.agentStatus.isProcessing ? "default" : "secondary"}
-              >
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* TOP BAR - Status & Quick Actions */}
+      <div className="bg-white border-b border-gray-200 p-4 shrink-0">
+        <div className="flex items-center gap-8">
+          {/* Agent Status - Compact */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600">Task:</span>
+              <Badge variant={p.agentStatus.isProcessing ? "default" : "secondary"}>
                 {p.agentStatus.currentTask}
               </Badge>
             </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-slate-600">Progress</span>
-              <span className="text-sm font-medium text-slate-900">
+            <div className="flex items-center gap-2 min-w-[200px]">
+              <span className="text-sm text-slate-600">Progress:</span>
+              <Progress value={p.agentStatus.progress} className="flex-1" />
+              <span className="text-sm font-medium text-slate-900 min-w-[40px]">
                 {p.agentStatus.progress}%
               </span>
             </div>
-            <Progress value={p.agentStatus.progress} className="w-full" />
           </div>
-        </div>
 
-        {/* quick actions */}
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
-          <p className="text-xs text-slate-500 mb-3">Click to start generating content</p>
-          {([
-            ["presentation", BarChart3, "Create Presentation"],
-            ["report", FileText, "Generate Report"],
-            ["website", Globe, "Build Website"],
-            ["analyze", TrendingUp, "Analyze Data"],
-          ] as const).map(([key, Icon, label]) => (
-            <Button
-              key={key}
-              variant="ghost"
-              className="w-full justify-start hover:bg-primary/10"
-              onClick={() => p.onQuickAction(key as string)}
-              data-testid={`button-quick-${key}`}
-            >
-              <Icon className="w-4 h-4 mr-2" />
-              {label}
-            </Button>
-          ))}
-        </div>
+          {/* Quick Actions - Horizontal */}
+          <div className="flex items-center gap-2 flex-1">
+            {([
+              ["presentation", BarChart3, "Presentation"],
+              ["report", FileText, "Report"],
+              ["website", Globe, "Website"],
+              ["analyze", TrendingUp, "Analyze"],
+            ] as const).map(([key, Icon, label]) => (
+              <Button
+                key={key}
+                variant="ghost"
+                size="sm"
+                onClick={() => p.onQuickAction(key as string)}
+                data-testid={`button-quick-${key}`}
+              >
+                <Icon className="w-4 h-4 mr-1" />
+                {label}
+              </Button>
+            ))}
+          </div>
 
-        {/* output formats */}
-        <div className="p-6">
-          <h3 className="text-sm font-semibold mb-3">Output Formats</h3>
-          <div className="grid grid-cols-2 gap-2">
+          {/* Output Formats - Compact */}
+          <div className="flex items-center gap-2">
             {["PPTX", "PDF", "DOCX", "HTML", "CSV", "MD"].map((f) => (
-              <Badge key={f} variant="secondary" className="justify-center">
+              <Badge key={f} variant="outline" className="text-xs">
                 {f}
               </Badge>
             ))}
@@ -158,23 +149,25 @@ export function AgentWorkspace(p: Props) {
         </div>
       </div>
 
-      {/* ───────── right tabs ───────── */}
-      <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
+      {/* TABS - FULL WIDTH */}
+      <div className="flex-1 flex flex-col overflow-hidden">
         <Tabs
           value={p.activeTab}
           onValueChange={(v) => p.onTabChange(v as TabType)}
+          className="flex-1 flex flex-col"
         >
           <div className="bg-white border-b border-gray-200">
-            <TabsList className="h-auto bg-transparent w-full">
+            <TabsList className="h-auto bg-transparent w-full justify-start">
               {["chat", "logs", "artifacts"].map((t) => (
                 <TabsTrigger
                   key={t}
                   value={t}
                   className="rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                  data-testid={`tab-${t}`}
                 >
-                  {t === "chat" && "Chat & Responses"}
-                  {t === "logs" && "Real‑time Logs"}
-                  {t === "artifacts" && "Generated Artifacts"}
+                  {t === "chat" && "💬 Chat & Responses"}
+                  {t === "logs" && "📋 Real-time Logs"}
+                  {t === "artifacts" && "📦 Generated Artifacts"}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -183,7 +176,7 @@ export function AgentWorkspace(p: Props) {
           {/* CHAT */}
           <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
             <div ref={chatContainerRef} className="h-full overflow-y-scroll overflow-x-hidden p-4 md:p-6 scrollbar-visible" style={{ WebkitOverflowScrolling: "touch" }}>
-              <div className="space-y-4 max-w-4xl">
+              <div className="space-y-4 max-w-4xl mx-auto">
                 {p.messages.map((m) => {
                   const bg =
                     m.role === "user"
@@ -202,65 +195,19 @@ export function AgentWorkspace(p: Props) {
                             <div className="w-6 h-6 bg-primary rounded-full flex justify-center items-center">
                               <span className="text-xs text-white">AI</span>
                             </div>
-                            <span className="text-sm font-medium">
-                              Agent Diaz
-                            </span>
-                            {m.status && (
-                              <Badge
-                                variant={
-                                  m.status === "completed"
-                                    ? "default"
-                                    : "secondary"
-                                }
-                              >
-                                {m.status}
-                              </Badge>
-                            )}
+                            <span className="text-xs text-slate-500">Agent Diaz</span>
                           </div>
                         )}
-                        <p className="text-sm whitespace-pre-wrap">
+                        <p className="text-sm md:text-base whitespace-pre-wrap break-words">
                           {m.content}
                         </p>
-                        {m.steps && m.steps.length > 0 && (
-                          <div className="mt-3 space-y-2">
-                            {m.steps.map((s) => (
-                              <div
-                                key={s.id}
-                                className="flex items-center text-sm space-x-2"
-                              >
-                                <div
-                                  className={`w-4 h-4 rounded-full flex justify-center items-center ${
-                                    s.status === "completed"
-                                      ? "bg-green-500"
-                                      : s.status === "processing"
-                                        ? "bg-blue-500 animate-spin"
-                                        : "bg-gray-300"
-                                  }`}
-                                >
-                                  {s.status === "completed" && (
-                                    <span className="text-xs text-white">
-                                      ✓
-                                    </span>
-                                  )}
-                                </div>
-                                <span
-                                  className={
-                                    s.status === "pending"
-                                      ? "text-slate-400"
-                                      : undefined
-                                  }
-                                >
-                                  {s.name}
-                                </span>
-                              </div>
-                            ))}
+                        {m.status === "streaming" && (
+                          <div className="mt-2 flex items-center space-x-1">
+                            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+                            <div className="w-2 h-2 bg-primary rounded-full animate-bounce delay-75" />
+                            <div className="w-2 h-2 bg-primary rounded-full animate-bounce delay-150" />
                           </div>
                         )}
-                        <span className="text-xs opacity-70 mt-2 block">
-                          {formatDistanceToNow(m.timestamp, {
-                            addSuffix: true,
-                          })}
-                        </span>
                       </div>
                     </div>
                   );
@@ -272,28 +219,21 @@ export function AgentWorkspace(p: Props) {
 
           {/* LOGS */}
           <TabsContent value="logs" className="flex-1 m-0 overflow-hidden">
-            <div ref={logContainerRef} className="h-full overflow-y-scroll overflow-x-hidden bg-slate-900 text-green-400 font-mono text-xs md:text-sm scrollbar-visible" style={{ WebkitOverflowScrolling: "touch" }}>
-              <div className="p-4 space-y-1">
-                {p.logs.map((l) => {
-                  // ── guard: ensure ts is Date
-                  const ts =
-                    typeof l.timestamp === "string"
-                      ? new Date(l.timestamp)
-                      : l.timestamp;
-                  return (
-                    <div key={l.id} className="whitespace-pre-wrap">
-                      <span className="text-slate-500">
-                        [{ts.toISOString().slice(11, 19)}]
-                      </span>
-                      <span className={`ml-2 ${logColor(l.type)}`}>
-                        [{l.type}] {l.message}
-                      </span>
-                    </div>
-                  );
-                })}
+            <div ref={logContainerRef} className="h-full overflow-y-scroll p-4 md:p-6 bg-slate-900 font-mono text-sm scrollbar-visible" style={{ WebkitOverflowScrolling: "touch" }}>
+              <div className="space-y-1">
+                {p.logs.map((l, i) => (
+                  <div key={i} className="flex gap-3 items-start">
+                    <span className="text-slate-500 shrink-0 tabular-nums">
+                      {new Date(l.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className={`${logColor(l.type)} break-words flex-1`}>
+                      [{l.type.toUpperCase()}] {l.message}
+                    </span>
+                  </div>
+                ))}
                 {p.logs.length === 0 && (
                   <div className="text-slate-500 text-center py-8">
-                    No logs yet. Start a task to see real‑time progress.
+                    No logs yet. Logs will appear here as the agent works.
                   </div>
                 )}
                 <div ref={logEndRef} />
@@ -303,81 +243,70 @@ export function AgentWorkspace(p: Props) {
 
           {/* ARTIFACTS */}
           <TabsContent value="artifacts" className="flex-1 m-0 overflow-hidden">
-            <div className="h-full overflow-y-auto overflow-x-hidden bg-gray-50 scrollbar-visible">
-              <div className="p-6">
-                {p.artifacts.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500">
-                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No artifacts generated yet.</p>
-                    <p className="text-sm">
-                      Start a conversation to create content.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid gap-4">
-                    {p.artifacts.map((a) => (
-                      <Card key={a.id}>
-                        <CardContent className="pt-4">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <CardTitle className="text-base mb-2">
-                                {icon(a.fileType)} {a.filename}
-                              </CardTitle>
-                              <CardDescription className="mb-3">
-                                <span className="mr-4">
-                                  {a.fileType.toUpperCase()}
-                                </span>
-                                <span className="mr-4">
-                                  {fmtSize(a.fileSize)}
-                                </span>
-                                <span>
-                                  {formatDistanceToNow(a.createdAt, {
-                                    addSuffix: true,
-                                  })}
-                                </span>
-                              </CardDescription>
-                              <div className="flex flex-wrap gap-2">
-                                {a.metadata?.slides && (
-                                  <Badge variant="outline">
-                                    ✅ {a.metadata.slides} slides
-                                  </Badge>
-                                )}
-                                {a.metadata?.images && (
-                                  <Badge variant="outline">
-                                    ✅ {a.metadata.images} images
-                                  </Badge>
-                                )}
-                                {a.metadata?.charts && (
-                                  <Badge variant="outline">
-                                    ✅ {a.metadata.charts} charts
-                                  </Badge>
-                                )}
-                                {a.metadata?.pages && (
-                                  <Badge variant="outline">
-                                    ✅ {a.metadata.pages} pages
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex space-x-2 ml-4">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => p.onPreviewArtifact(a)}
-                              >
-                                <Eye className="w-4 h-4 mr-1" /> Preview
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => p.onDownloadArtifact(a)}
-                              >
-                                <Download className="w-4 h-4 mr-1" /> Download
-                              </Button>
-                            </div>
+            <div className="h-full overflow-y-scroll p-4 md:p-6 bg-gray-50 scrollbar-visible" style={{ WebkitOverflowScrolling: "touch" }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto">
+                {p.artifacts.map((a) => (
+                  <Card key={a.id} className="hover:shadow-lg transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-2xl">{icon(a.type)}</span>
+                          <div>
+                            <CardTitle className="text-sm font-medium">
+                              {a.filename}
+                            </CardTitle>
+                            <CardDescription className="text-xs">
+                              {a.type.toUpperCase()} • {fmtSize(a.size)}
+                            </CardDescription>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                        </div>
+                      </div>
+
+                      {a.metadata?.title && (
+                        <p className="text-sm text-slate-600 mb-3 line-clamp-2">
+                          {a.metadata.title}
+                        </p>
+                      )}
+
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => p.onPreviewArtifact(a)}
+                          data-testid={`button-preview-${a.id}`}
+                        >
+                          <Eye className="w-3 h-3 mr-1" />
+                          Preview
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => p.onDownloadArtifact(a)}
+                          data-testid={`button-download-${a.id}`}
+                        >
+                          <Download className="w-3 h-3 mr-1" />
+                          Download
+                        </Button>
+                      </div>
+
+                      {a.createdAt && (
+                        <p className="text-xs text-slate-400 mt-2">
+                          {formatDistanceToNow(new Date(a.createdAt), {
+                            addSuffix: true,
+                          })}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+                {p.artifacts.length === 0 && (
+                  <div className="col-span-full text-center py-12 text-slate-500">
+                    <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No artifacts generated yet.</p>
+                    <p className="text-sm mt-1">
+                      Generated files will appear here.
+                    </p>
                   </div>
                 )}
               </div>
