@@ -227,7 +227,7 @@ export function AgentWorkspace(p: Props) {
                       {new Date(l.timestamp).toLocaleTimeString()}
                     </span>
                     <span className={`${logColor(l.type)} break-words flex-1`}>
-                      [{l.type.toUpperCase()}] {l.message}
+                      [{l.type?.toUpperCase() || "LOG"}] {l.message}
                     </span>
                   </div>
                 ))}
@@ -256,7 +256,7 @@ export function AgentWorkspace(p: Props) {
                               {a.filename}
                             </CardTitle>
                             <CardDescription className="text-xs">
-                              {a.type.toUpperCase()} • {fmtSize(a.size)}
+                              {a.type?.toUpperCase() || "FILE"} • {fmtSize(a.size || 0)}
                             </CardDescription>
                           </div>
                         </div>
