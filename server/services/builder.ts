@@ -884,7 +884,7 @@ class BuilderService {
 
     // Save
     const filename = makeFilename(title, "pptx");
-    const buffer = Buffer.from((await pres.write("nodebuffer")) as ArrayBuffer);
+    const buffer = Buffer.from((await pres.write({ outputType: "nodebuffer" } as any)) as ArrayBuffer);
     const filePath = await fileStorage.saveFile(filename, buffer);
     const { size } = await fileStorage.getFileStats(filename);
 
