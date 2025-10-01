@@ -98,7 +98,7 @@ export function AgentWorkspace(p: Props) {
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* ───────── left panel ───────── */}
-      <div className="hidden md:flex w-80 bg-white border-r border-gray-200 flex-col">
+      <div className="flex w-64 md:w-80 bg-white border-r border-gray-200 flex-col">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">
             Agent Status
