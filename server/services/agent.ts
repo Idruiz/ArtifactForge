@@ -362,8 +362,11 @@ class AgentService {
     if (wants("dashboard")) picks.push("dashboard");
     if (wants("infographic")) picks.push("infographic");
     
-    // Website/HTML detection
-    if (wants("html") || wants("website") || wants("web page") || wants("web app")) picks.push("html");
+    // Website detection (actual HTML website, not presentation export)
+    if (wants("website") || wants("web page") || wants("web app") || wants("landing page") || wants("site") || wants("portfolio") || wants("blog")) picks.push("website");
+    
+    // HTML presentation export (slide deck as HTML)
+    if (wants("html presentation") || wants("html export") || wants("html slides")) picks.push("html");
     
     // Document formats
     if (wants("docx") || wants("word") || wants("document")) picks.push("docx");
