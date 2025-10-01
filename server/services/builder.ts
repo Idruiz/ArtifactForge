@@ -597,7 +597,21 @@ function donutIsMeaningful(specIn: any, allowTwoCat: boolean, minImbalancePct: n
 
 class BuilderService {
   async buildPresentation(taskId: string, opts: BuildOptions): Promise<BuildResult> {
-    await logger.stepStart(taskId, "Building presentation");
+    const formatLabels: Record<string, string> = {
+      pptx: "presentation",
+      html: "HTML presentation",
+      website: "website",
+      docx: "document",
+      report: "report",
+      dashboard: "dashboard",
+      infographic: "infographic",
+      md: "markdown",
+      csv: "CSV",
+      txt: "text file",
+      rtf: "RTF file"
+    };
+    const label = formatLabels[opts.format] || opts.format;
+    await logger.stepStart(taskId, `Building ${label}`);
     const { title, format, sources = [] } = opts;
 
     // Seed per-slide chartSpec from slide text; keep compat with agent
@@ -903,7 +917,7 @@ class BuilderService {
       throw new Error(`Presentation validation failed: ${validation.errors.join(", ")}`);
     }
 
-    await logger.stepEnd(taskId, "Building presentation");
+    await logger.stepEnd(taskId, "Building PPTX presentation");
     return {
       filename,
       fileSize: size,
