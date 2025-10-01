@@ -96,9 +96,9 @@ export function AgentWorkspace(p: Props) {
   }, [p.logs]);
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden w-full">
       {/* ───────── left panel ───────── */}
-      <div className="w-64 md:w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div className="w-64 lg:w-80 bg-white border-r border-gray-200 flex flex-col shrink-0">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">
             Agent Status
@@ -159,13 +159,13 @@ export function AgentWorkspace(p: Props) {
       </div>
 
       {/* ───────── right tabs ───────── */}
-      <div className="flex-1 flex flex-col bg-gray-50" style={{ minWidth: "500px", display: "flex" }}>
+      <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
         <Tabs
           value={p.activeTab}
           onValueChange={(v) => p.onTabChange(v as TabType)}
         >
-          <div className="bg-white border-b border-gray-200" style={{ display: "block" }}>
-            <TabsList className="h-auto bg-transparent" style={{ display: "flex", width: "100%" }}>
+          <div className="bg-white border-b border-gray-200">
+            <TabsList className="h-auto bg-transparent w-full">
               {["chat", "logs", "artifacts"].map((t) => (
                 <TabsTrigger
                   key={t}
