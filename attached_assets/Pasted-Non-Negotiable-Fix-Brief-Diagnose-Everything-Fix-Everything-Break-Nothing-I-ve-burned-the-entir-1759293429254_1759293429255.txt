@@ -1,0 +1,186 @@
+Non-Negotiable Fix Brief — Diagnose Everything, Fix Everything, Break Nothing
+
+I’ve burned the entire budget on repetitive regressions. From now on, you fix all errors in one coordinated pass with the Architect looped in. This is not a “patch a line” job. This needs systematic diagnosis, full test coverage of broken paths, and additive hardening without nuking working features.
+
+What’s broken (verbatim issues that must be reproduced and closed)
+
+Panels missing (again).
+Quick Actions is correct, but the three-panel layout collapses; the Artifacts panel disappears and I cannot retrieve generated artifacts. The Live Logs panel is also missing. Layout keeps regressing.
+
+Artifacts delivery failure.
+To dodge panel regressions, the agent must always deliver artifacts in-chat (inline attachment + download), and the Artifacts panel must remain functional. Both. Not either/or.
+
+Chat area does not scroll.
+I’ve said this 20+ times. The chat UI never auto-scrolls to the latest message. Fix auto-scroll on initial render, on stream chunks, and on post-render DOM mutations.
+
+Car Mode is half-baked.
+It says “listening” but just repeats the last response. It never transitions to transcribing → sending → receiving → speaking. No proper state machine, no VAD, no debounce, no error handling.
+
+Presentation/Web output incorrect.
+
+“Website” output is a single unstyled HTML blob—not a navigable site.
+
+Buttons are hard-wired to wrong pages.
+
+The “Presentation” is fine, but the “Website” must be a real multi-page site (index + linked pages, assets, nav) with baseline styling and working links.
+
+DocX/PDF output quality is unacceptable.
+Formatting is poor, no visual hierarchy, no charts/figures. It’s flat text. Unusable.
+
+General robustness is weak.
+The app needs substantial code and logic, not sprinkling one-liners. We need methodical, testable building that never breaks what already works.
+
+Required fixes (explicit, implement all)
+A) Three-Panel Layout — restore, lock, and test
+
+Structure: Persistent layout with Left = Quick Actions, Center = Chat, Right = (1) Live Logs (top), (2) Artifacts Browser (bottom).
+
+Persistence: Layout state saved and restored on reload.
+
+No flicker / no “unmount on route change”. Use stable keys and don’t conditionally unmount panels during async ops.
+
+Visual affordances: Resizable splitters; collapse/expand controls; panel min widths; overflow scrolling enabled.
+
+B) Artifacts — dual-delivery contract
+
+Always attach artifacts inline in chat:
+
+If text → render block with copy/download.
+
+If doc/ppt/pdf → show filename, size, “Preview” (if supported), and “Download”.
+
+If site bundle → provide zipped assets + live preview link (if sandbox supports it).
+
+Also index into the Artifacts panel with metadata (type, title, createdAt, source prompt, runId).
+
+Persist server-side with stable IDs; chat references point to the same artifact record.
+
+No race conditions: post artifact only after write success (or show explicit retry).
+
+C) Chat auto-scroll — make it boringly reliable
+
+CSS: overflow-y: auto; overscroll-behavior: contain; on the scroll container.
+
+Logic: After each render and on each token chunk, call lastMessageRef.scrollIntoView({block: 'end'}).
+
+Add a MutationObserver to catch late media/attachments that change height; throttle to 60–100ms.
+
+Respect user scroll override: if user has scrolled up beyond threshold, pause auto-scroll and show a “Jump to latest” pill.
+
+D) Car Mode — implement a real state machine
+
+States: IDLE → LISTENING → TRANSCRIBING → SENDING → THINKING → SPEAKING → IDLE.
+
+No loopback echoes. Cache last assistant message id; never replay it as speech unless it’s newly generated.
+
+VAD / end-of-utterance with timeout + silence threshold; debounce input.
+
+Error paths: on API or mic error, announce the error, reset to IDLE, and show a retry CTA.
+
+Controls: big mic toggle, visual levels meter, explicit “Cancel” during THINKING/SPEAKING, and a hands-free “wake” if supported.
+
+Privacy: mic permission state clearly indicated.
+
+E) Website vs Presentation — correct generator routing and output
+
+Route by intent:
+
+“Presentation” → slide deck (PPTX/Google Slides/HTML slides) with titles, bullets, speaker notes, and a clean theme.
+
+“Website” → multi-page scaffold: /index.html, /about.html (or content pages), /assets/…, a shared /styles.css, and nav linking across pages.
+
+Buttons/links: relative paths, verified after bundling; no prelinked junk.
+
+Styling: minimal, semantic HTML + CSS; readable typography; responsive container; no walls of unstyled text.
+
+F) DocX/PDF quality — minimum bar
+
+Headings H1/H2/H3, consistent margins, page numbers.
+
+Lists, tables, and callout boxes where relevant.
+
+At least one figure/chart when data is present.
+
+Export both .docx and .pdf; embed fonts or use system-safe stack.
+
+G) Hardening, telemetry, and guards
+
+Centralized error boundary for UI with user-readable recoveries.
+
+Structured logs in Live Logs panel (INFO/WARN/ERROR with runId, user action, duration).
+
+Retry policy (idempotent where applicable) with backoff.
+
+Feature flags to ship incrementally without regressions.
+
+Snapshot tests for layout, e2e tests for panel presence and chat scroll, unit tests for state machine transitions.
+
+Acceptance tests (must pass exactly as written)
+
+Panels: Reload app. All three panels visible. Collapse/expand each; state persists after reload. No panel disappears during a generation run.
+
+Artifacts dual-delivery: Request a website and a presentation.
+
+In chat: both artifacts appear with filename, size, and working download.
+
+In Artifacts panel: same two entries with matching runId. Clicking an entry re-opens the artifact in chat. No duplicates.
+
+Auto-scroll: Send a long streaming answer. The chat stays locked to the bottom. Scroll up manually; auto-scroll pauses. Tap “Jump to latest”; it resumes and sticks to bottom.
+
+Car Mode:
+
+Tap Car Mode. UI shows LISTENING; speak. It transitions to TRANSCRIBING (live partials OK), then SENDING/THINKING, then SPEAKING the new answer.
+
+Speak again immediately; it queues properly—no echo of the previous reply, no stuck state. Disable mic; state returns to IDLE.
+
+Website generation:
+
+Output is a zip with /index.html, /styles.css, at least one additional page, and working nav links. Open index.html locally; links work. Content is structured and styled.
+
+Presentation generation:
+
+Output is a slide deck (HTML slides or PPTX). Titles, bullet points, clean layout. No giant unstyled paragraph dump.
+
+DocX/PDF:
+
+Open both. Headings render correctly, lists/tables intact, at least one chart/figure when input included data. No broken fonts, no empty first page.
+
+Regression guard:
+
+After completing all above, refresh the app and repeat (1)–(3). Results must be identical. No flake.
+
+Implementation notes (do these, don’t argue)
+
+Layout: lock panels with a splitter library or your existing resizable layout; never conditionally unmount the right rail.
+
+Scroll: requestAnimationFrame around scrollIntoView after each message chunk; also on image onload.
+
+State machine: implement as a pure reducer or XState—log every transition to Live Logs with timestamps.
+
+Artifacts: single write path with acks; store metadata {id, kind, name, bytes, mime, createdAt, runId, promptHash}.
+
+Routing: map intents to generators; validate params before calling the model; fail fast with user-readable errors.
+
+DocX/PDF: use a template engine + styles; outlaw raw unstyled dumps.
+
+Definition of Done (sign-off checklist)
+
+ All acceptance tests pass twice consecutively.
+
+ No console errors in a full “website + presentation + docx/pdf” session.
+
+ Live Logs shows complete trace for each run (start → finish, durations).
+
+ No panel disappearance across route changes or async spans.
+
+ Chat auto-scroll works and respects manual override.
+
+ Car Mode runs through all states and never echoes stale output.
+
+ Website deliverable is a navigable, styled multi-page bundle.
+
+ DocX/PDF deliverables meet the minimum visual bar.
+
+ Feature flags let us disable Car Mode or Website generator without touching the rest.
+
+Ship this as a single PR that fixes the failures end-to-end, with tests and logs proving it. No “quick patch.” No nukes. No regressions.

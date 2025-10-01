@@ -9,7 +9,6 @@ import {
   ApiKeys,
   Persona,
   Tone,
-  TabType,
   Artifact,
   ChatMessage,
 } from "@/lib/types";
@@ -36,7 +35,6 @@ export default function Home() {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [contentAgentEnabled, setContentAgentEnabled] = useState(false);
   const [chatInput, setChatInput] = useState("");
-  const [activeTab, setActiveTab] = useState<TabType>("chat");
   const [showApiKeysModal, setShowApiKeysModal] = useState(false);
   const [apiKeys, setApiKeys] = useState<ApiKeys>({
     openai: storedKeys.openai || "",
@@ -105,8 +103,6 @@ export default function Home() {
           conversationHistory: allMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
         },
       });
-
-      setActiveTab("chat");
     }
   );
 
@@ -154,7 +150,6 @@ export default function Home() {
     });
 
     setChatInput("");
-    setActiveTab("chat");
   };
 
   const handleQuickAction = (action: string) => {
@@ -170,7 +165,6 @@ export default function Home() {
     const prompt = prompts[action] || "";
     if (prompt) {
       setChatInput(prompt);
-      setActiveTab("chat");
       // Focus the input so user can immediately edit
       setTimeout(() => {
         const input = document.querySelector<HTMLTextAreaElement>('textarea[data-testid="input-chat"]');
@@ -267,8 +261,6 @@ export default function Home() {
         messages={allMessages}
         logs={logs}
         artifacts={artifacts}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
         onQuickAction={handleQuickAction}
         onDownloadArtifact={handleDownloadArtifact}
         onPreviewArtifact={handlePreviewArtifact}

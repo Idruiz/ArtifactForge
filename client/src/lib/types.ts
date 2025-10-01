@@ -4,6 +4,14 @@ export interface ApiKeys {
   unsplash?: string;
 }
 
+export interface ArtifactRef {
+  id: string;
+  filename: string;
+  fileType: string;
+  fileSize: number;
+  downloadUrl: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -11,6 +19,7 @@ export interface ChatMessage {
   timestamp: Date;
   status?: 'processing' | 'completed';
   steps?: TaskStep[];
+  attachments?: ArtifactRef[];
 }
 
 export interface TaskStep {

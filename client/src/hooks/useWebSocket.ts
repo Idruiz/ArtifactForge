@@ -68,9 +68,29 @@ export function useWebSocket(sessionId: string): UseWebSocketReturn {
             case "status":
               setAgentStatus(message.data);
               break;
-            case "artifact":
-              setArtifacts((prev) => [...prev, message.data]);
+            case "artifact": {
+              const artifact = message.data;
+              // Add to artifacts panel
+              setArtifacts((prev) => [...prev, artifact]);
+              
+              // Dual-delivery: Also add as a chat message with attachment
+              const attachmentMessage: ChatMessage = {
+                id: `artifact-${artifact.id}`,
+                role: "assistant",
+                content: `✅ Generated: ${artifact.filename}`,
+                timestamp: new Date(artifact.createdAt || new Date()),
+                status: "completed",
+                attachments: [{
+                  id: artifact.id,
+                  filename: artifact.filename,
+                  fileType: artifact.fileType,
+                  fileSize: artifact.fileSize,
+                  downloadUrl: artifact.downloadUrl,
+                }],
+              };
+              setMessages((prev) => [...prev, attachmentMessage]);
               break;
+            }
             case "message":
               setMessages((prev) => [...prev, message.data]);
               break;
