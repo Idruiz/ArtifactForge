@@ -1477,6 +1477,311 @@ class BuilderService {
     };
   }
 
+  /* ──────────────────────────── Website Builder ──────────────────────────── */
+
+  private async buildWebsite(
+    taskId: string,
+    title: string,
+    slides: any[],
+    sources?: string[],
+  ): Promise<BuildResult> {
+    const theme = deriveTheme(title);
+    
+    const heroText = slides?.[0]?.content?.subtitle || slides?.[0]?.content?.body || "Welcome to our website";
+    const heroImage = slides?.[0]?.content?.image?.url || "";
+    
+    const sections = (slides || []).slice(1).map((s: any, i: number) => ({
+      id: `section-${i + 1}`,
+      heading: s?.title ? String(s.title) : `Section ${i + 1}`,
+      body: s?.content?.subtitle ? String(s.content.subtitle) : (s?.content?.body ? String(s.content.body) : ""),
+      bullets: Array.isArray(s?.content?.bullets) ? s.content.bullets : [],
+      image: s?.content?.image?.url || "",
+      chart: s?.content?.chart?.url || "",
+    })).slice(0, 10);
+
+    const navLinks = sections.map(s => 
+      `<a href="#${s.id}">${escapeXml(s.heading)}</a>`
+    ).join("");
+
+    const sectionsHtml = sections.map((sec) => {
+      const bulletsHtml = sec.bullets.length
+        ? '<ul>' + sec.bullets.map((b: string) => '<li>' + escapeXml(b) + '</li>').join("") + '</ul>'
+        : '';
+      
+      const mediaHtml = sec.image 
+        ? `<img src="${sec.image}" alt="${escapeXml(sec.heading)}" loading="lazy" />`
+        : (sec.chart ? `<img src="${sec.chart}" alt="Chart for ${escapeXml(sec.heading)}" loading="lazy" />` : '');
+
+      const hasMedia = !!(sec.image || sec.chart);
+      const bodyText = sec.body ? '<p>' + escapeXml(sec.body).replace(/\n/g, '<br/>') + '</p>' : '';
+
+      return `
+        <section id="${sec.id}" class="content-section ${hasMedia ? 'split' : ''}">
+          <div class="section-content">
+            <h2>${escapeXml(sec.heading)}</h2>
+            ${bodyText}
+            ${bulletsHtml}
+          </div>
+          ${mediaHtml ? `<div class="section-media">${mediaHtml}</div>` : ''}
+        </section>`;
+    }).join("");
+
+    const refsHtml = (sources && sources.length)
+      ? '<div class="references"><h3>References & Sources</h3><ul>' +
+        firstN(sources, 10)
+          .map((s) => '<li><a href="' + s + '" target="_blank" rel="noopener">' + escapeXml(s) + '</a></li>')
+          .join("") +
+        '</ul></div>'
+      : '';
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="${escapeXml(heroText.slice(0, 160))}">
+  <title>${escapeXml(safeTitle(title))}</title>
+  <style>
+    :root {
+      --primary: ${theme.a};
+      --secondary: ${theme.b};
+      --bg: ${theme.bg};
+      --text: ${theme.text};
+      --mute: ${theme.mute};
+      --card: ${theme.card};
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+    }
+    
+    nav {
+      background: var(--card);
+      padding: 1rem 2rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+    
+    nav .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    nav a {
+      color: var(--text);
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.3s ease;
+    }
+    
+    nav a:hover {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .hero {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      padding: 5rem 2rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .hero h1 {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .hero p {
+      font-size: 1.25rem;
+      max-width: 700px;
+      margin: 0 auto 2rem;
+      opacity: 0.95;
+    }
+    
+    ${heroImage ? `
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('${heroImage}') center/cover;
+      opacity: 0.2;
+      z-index: 0;
+    }
+    
+    .hero > * {
+      position: relative;
+      z-index: 1;
+    }
+    ` : ''}
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    .content-section {
+      margin: 4rem 0;
+      padding: 3rem;
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    
+    .content-section.split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      align-items: center;
+    }
+    
+    .content-section h2 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
+    }
+    
+    .content-section p {
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+    
+    .content-section ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    
+    .content-section li {
+      padding: 0.5rem 0;
+      padding-left: 1.5rem;
+      position: relative;
+    }
+    
+    .content-section li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--primary);
+      font-weight: bold;
+    }
+    
+    .section-media img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+    
+    footer {
+      background: var(--card);
+      padding: 3rem 2rem;
+      margin-top: 4rem;
+      text-align: center;
+      border-top: 3px solid var(--primary);
+    }
+    
+    .references {
+      background: var(--bg);
+      padding: 2rem;
+      border-radius: 8px;
+      margin: 2rem 0;
+    }
+    
+    .references h3 {
+      color: var(--primary);
+      margin-bottom: 1rem;
+    }
+    
+    .references ul {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .references li {
+      padding: 0.5rem 0;
+    }
+    
+    .references a {
+      color: var(--secondary);
+      text-decoration: none;
+      word-break: break-all;
+    }
+    
+    .references a:hover {
+      text-decoration: underline;
+    }
+    
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2rem; }
+      .hero p { font-size: 1rem; }
+      nav { flex-direction: column; gap: 0.5rem; }
+      .content-section.split {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">${escapeXml(safeTitle(title))}</div>
+    ${navLinks}
+  </nav>
+  
+  <div class="hero">
+    <h1>${escapeXml(safeTitle(title))}</h1>
+    <p>${escapeXml(heroText)}</p>
+  </div>
+  
+  <div class="container">
+    ${sectionsHtml}
+  </div>
+  
+  <footer>
+    ${refsHtml}
+    <p style="margin-top: 2rem; color: var(--mute);">
+      © ${new Date().getFullYear()} ${escapeXml(safeTitle(title))}. Generated by Agent Diaz.
+    </p>
+  </footer>
+</body>
+</html>`;
+
+    const filename = makeFilename(`${title}_Website`, "html");
+    const buffer = Buffer.from(html, "utf8");
+    const filePath = await fileStorage.saveFile(filename, buffer);
+    const { size } = await fileStorage.getFileStats(filename);
+
+    await logger.stepEnd(taskId, "Building website");
+    return {
+      filename,
+      fileSize: size,
+      filePath,
+      metadata: {
+        slides: sections.length + 1,
+        images: sections.filter((s) => s.image).length,
+        charts: sections.filter((s) => s.chart).length,
+        theme: theme.name,
+      },
+    };
+  }
+
   /* ─────────────────────── Derived fallback charts (donuts only) ─────────────────────── */
 
   private async buildDataDerivedFallbackCharts(
