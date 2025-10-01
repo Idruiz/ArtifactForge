@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChatPanel } from "@/components/ChatPanel";
 import { AgentWorkspace } from "@/components/AgentWorkspace";
 import { ApiKeysModal } from "@/components/ApiKeysModal";
