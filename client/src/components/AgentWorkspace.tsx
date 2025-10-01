@@ -159,13 +159,13 @@ export function AgentWorkspace(p: Props) {
       </div>
 
       {/* ───────── right tabs ───────── */}
-      <div className="flex-1 flex flex-col bg-gray-50" style="min-width:500px;display:flex!important">
+      <div className="flex-1 flex flex-col bg-gray-50" style={{ minWidth: "500px", display: "flex" }}>
         <Tabs
           value={p.activeTab}
           onValueChange={(v) => p.onTabChange(v as TabType)}
         >
-          <div className="bg-white border-b border-gray-200" style="display:block!important">
-            <TabsList className="h-auto bg-transparent" style="display:flex!important;width:100%">
+          <div className="bg-white border-b border-gray-200" style={{ display: "block" }}>
+            <TabsList className="h-auto bg-transparent" style={{ display: "flex", width: "100%" }}>
               {["chat", "logs", "artifacts"].map((t) => (
                 <TabsTrigger
                   key={t}
