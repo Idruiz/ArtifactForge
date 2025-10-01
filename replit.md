@@ -2,16 +2,49 @@
 
 ## Overview
 
-Agent Diaz is a sophisticated autonomous AI agent that generates professional content artifacts in multiple formats from natural language prompts. The application features a real-time chat interface with AI personas, voice capabilities (including hands-free Car Mode), and produces downloadable artifacts in PPTX, DOCX, HTML, CSV, and Markdown formats. This is a full-stack application built with Node.js/Express backend and React frontend, designed to replace a Firebase Studio AI agent with improved reliability and delivery capabilities.
+Agent Diaz is a sophisticated autonomous AI agent that generates professional content artifacts in multiple formats from natural language prompts. The application features a **three-panel persistent interface** (Quick Actions, Chat, Logs/Artifacts), real-time AI chat with personas, voice capabilities including **hands-free Car Mode with explicit FSM**, and produces downloadable artifacts in PPTX, DOCX, HTML, CSV, and Markdown formats. This is a full-stack application built with Node.js/Express backend and React frontend, designed to replace a Firebase Studio AI agent with improved reliability and delivery capabilities.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Updates (October 2025)
+
+### Major UI Overhaul - Three-Panel Layout
+- ✅ **Replaced tab system** with three-panel ResizablePanelGroup layout
+- ✅ **Left Panel (15%)**: Quick Actions for common content types
+- ✅ **Center Panel (50%)**: Chat interface with messages and inline artifacts
+- ✅ **Right Panel (35%)**: Vertical split for Live Logs (top) + Artifacts browser (bottom)
+- ✅ **localStorage persistence** for panel sizes across sessions
+- ✅ **Mobile responsive** with proper touch handling for Android devices
+
+### Dual-Delivery Artifacts
+- ✅ **Artifacts appear in TWO places**: as inline attachments in chat messages AND in the dedicated Artifacts panel
+- ✅ **ArtifactRef interface** for consistent artifact representation
+- ✅ **Download buttons** available in both locations
+- ✅ **Real-time updates** via WebSocket for both delivery channels
+
+### Smart Auto-Scroll
+- ✅ **Near-bottom detection** (150px threshold) for chat auto-scroll
+- ✅ **Jump to latest button** appears when user scrolls up, hides when near bottom
+- ✅ **requestAnimationFrame** for smooth scrolling performance
+- ✅ **User override respected** - no forced scrolling when reading history
+- ✅ **Separate log auto-scroll** with 200px threshold
+
+### Car Mode FSM (Production-Ready)
+- ✅ **Explicit state machine**: IDLE → LISTENING → TRANSCRIBING → SENDING → THINKING → SPEAKING → IDLE
+- ✅ **Console logging** of all state transitions for debugging
+- ✅ **90-second watchdog timer** prevents stuck THINKING state
+- ✅ **Proper lifecycle management**: recognition instance stable across listening state changes
+- ✅ **Error recovery**: all error paths transition to IDLE and attempt restart
+- ✅ **Reliable restart**: explicit recognition.start() after TTS completes
+- ✅ **State synchronization**: carModeStateRef eliminates dependency issues
+
 ## System Architecture
 
 ### Frontend Architecture
 - **Framework**: React 18 with TypeScript
+- **Layout**: ResizablePanelGroup (react-resizable-panels) with horizontal + nested vertical splits
 - **Styling**: Tailwind CSS with shadcn/ui component library
 - **State Management**: React hooks with custom WebSocket hook for real-time communication
 - **Routing**: Wouter for lightweight client-side routing
@@ -25,6 +58,7 @@ Preferred communication style: Simple, everyday language.
 - **Real-time**: WebSocket server for bidirectional communication
 - **File Storage**: Local filesystem with artifacts stored in `/artifacts` directory
 - **AI Integration**: OpenAI API for chat completions and content generation
+- **Packaging**: archiver for future multi-file artifact bundling
 
 ### Build System
 - **Frontend Build**: Vite with React plugin
@@ -37,7 +71,11 @@ Preferred communication style: Simple, everyday language.
 - **Persona Management**: Multiple AI personas (professional, creative, technical, etc.)
 - **Tone Control**: Adjustable communication tone (formal, casual, friendly, etc.)
 - **Voice Integration**: Speech-to-text input and text-to-speech output
-- **Car Mode**: Hands-free voice interaction with 3-second silence detection for automatic message sending
+- **Car Mode FSM**: Production-ready hands-free voice interaction with explicit state machine
+  - States: IDLE → LISTENING → TRANSCRIBING → SENDING → THINKING → SPEAKING → IDLE
+  - 3-second silence detection for automatic message sending
+  - 90-second watchdog timer for stuck THINKING state
+  - Comprehensive error recovery and logging
 - **Real-time Messaging**: WebSocket-based chat with live status updates and auto-reconnection
 
 ### Content Generation Agent
@@ -46,8 +84,16 @@ Preferred communication style: Simple, everyday language.
 - **Visual Assets**: Unsplash → Pixabay → Picsum fallback pipeline for images
 - **Chart Generation**: QuickChart.io integration for data visualizations
 - **Document Building**: Intelligent format detection supporting PPTX, DOCX, HTML, CSV, Markdown, Reports, Dashboards, and Infographics
-- **Format Detection**: Smart keyword-based format detection (website→HTML, document→DOCX, analysis→DOCX+MD, etc.)
+- **Format Detection**: Smart keyword-based format detection (website→HTML, document→DOCX, spreadsheet→CSV, analysis→DOCX+MD)
 - **Quick Actions**: User-customizable templates for common content types with format-specific keywords
+
+### UI/UX Features
+- **Three-Panel Layout**: Persistent Quick Actions | Chat | Logs+Artifacts panels
+- **Dual-Delivery**: Artifacts appear in chat AND dedicated panel simultaneously
+- **Smart Auto-Scroll**: Near-bottom detection with optional "Jump to latest" button
+- **Panel Persistence**: Resize preferences saved to localStorage
+- **Real-time Logs**: Live structured logging with color-coded log levels
+- **Artifact Browser**: Dedicated panel for browsing all generated files
 
 ### Task Management
 - **Async Processing**: Background task execution with progress tracking
@@ -72,7 +118,7 @@ Preferred communication style: Simple, everyday language.
    - Building phase: Document assembly and generation
    - Delivery phase: File storage and URL generation
 5. **Real-time Updates**: Progress and status updates sent via WebSocket
-6. **Artifact Delivery**: Completed files made available for download
+6. **Artifact Delivery**: Completed files made available for download in BOTH chat and panel
 
 ## External Dependencies
 
@@ -108,11 +154,33 @@ Preferred communication style: Simple, everyday language.
 - **Static Files**: Express serves built React app and artifact files
 - **Environment Variables**: API keys and database URL configured via environment
 - **Process Management**: Single Node.js process serving both API and static files
+- **Port**: 8080 for Cloud Run compatibility
 
 ### Configuration Requirements
 - `DATABASE_URL`: PostgreSQL connection string
 - `OPENAI_API_KEY`: Required for AI functionality
 - `SERP_API_KEY`: Optional for enhanced search
 - `UNSPLASH_ACCESS_KEY`: Optional for better image quality
+
+## Future Enhancements
+
+### Multi-Page Website Generation (Planned)
+- Archive multiple HTML pages into zip bundles
+- Generate navigation menu linking pages together
+- Shared CSS and assets across pages
+- Support for complex site structures (home, about, services, contact, etc.)
+
+### Enhanced DOCX Quality (Planned)
+- Proper heading hierarchy (H1, H2, H3)
+- Table of contents generation
+- Native table support
+- Embedded chart images
+- Optional PDF export via HTML-to-PDF conversion
+
+### Advanced Telemetry (Planned)
+- Structured error logging with severity levels
+- Performance metrics (generation time, API call counts)
+- User analytics (popular formats, successful generations)
+- Debugging aids (request/response traces)
 
 The application is designed for easy deployment on platforms like Replit, with persistent file storage and reliable artifact delivery being key architectural decisions to address the original Firebase Studio limitations.
