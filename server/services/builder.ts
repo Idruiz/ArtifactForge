@@ -608,6 +608,8 @@ class BuilderService {
         return await this.buildPPTX(taskId, title, slidesSeeded, sources, opts.layoutHints);
       case "html":
         return await this.buildHTML(taskId, title, slidesSeeded, sources, opts.layoutHints);
+      case "website":
+        return await this.buildWebsite(taskId, title, slidesSeeded, sources);
       case "docx":
         return await this.buildDOCX(taskId, title, slidesSeeded, sources);
       case "dashboard":
