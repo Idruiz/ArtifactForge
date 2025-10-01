@@ -82,7 +82,7 @@ app.use((req, res, next) => {
   }
 
   // ─── start HTTP server ───
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || (process.env.K_SERVICE ? "8080" : "5000"), 10);
   server.listen({ port, host: "0.0.0.0", reusePort: true }, () =>
     log(`serving on port ${port}`),
   );
