@@ -2,7 +2,7 @@
 
 ## Overview
 
-Agent Diaz is a sophisticated autonomous AI agent that generates professional presentations and reports from natural language prompts. The application features a real-time chat interface with AI personas, voice capabilities, and produces downloadable artifacts in multiple formats (PPTX, PDF, HTML). This is a full-stack application built with Node.js/Express backend and React frontend, designed to replace a Firebase Studio AI agent with improved reliability and delivery capabilities.
+Agent Diaz is a sophisticated autonomous AI agent that generates professional content artifacts in multiple formats from natural language prompts. The application features a real-time chat interface with AI personas, voice capabilities (including hands-free Car Mode), and produces downloadable artifacts in PPTX, DOCX, HTML, CSV, and Markdown formats. This is a full-stack application built with Node.js/Express backend and React frontend, designed to replace a Firebase Studio AI agent with improved reliability and delivery capabilities.
 
 ## User Preferences
 
@@ -37,14 +37,17 @@ Preferred communication style: Simple, everyday language.
 - **Persona Management**: Multiple AI personas (professional, creative, technical, etc.)
 - **Tone Control**: Adjustable communication tone (formal, casual, friendly, etc.)
 - **Voice Integration**: Speech-to-text input and text-to-speech output
-- **Real-time Messaging**: WebSocket-based chat with live status updates
+- **Car Mode**: Hands-free voice interaction with 3-second silence detection for automatic message sending
+- **Real-time Messaging**: WebSocket-based chat with live status updates and auto-reconnection
 
 ### Content Generation Agent
 - **Multi-step Pipeline**: Research → Outline → Visual Matching → Building → Delivery
 - **Web Search**: SerpAPI with DuckDuckGo fallback for content research
 - **Visual Assets**: Unsplash → Pixabay → Picsum fallback pipeline for images
 - **Chart Generation**: QuickChart.io integration for data visualizations
-- **Document Building**: Support for PPTX, PDF, and HTML generation
+- **Document Building**: Intelligent format detection supporting PPTX, DOCX, HTML, CSV, Markdown, Reports, Dashboards, and Infographics
+- **Format Detection**: Smart keyword-based format detection (website→HTML, document→DOCX, analysis→DOCX+MD, etc.)
+- **Quick Actions**: User-customizable templates for common content types with format-specific keywords
 
 ### Task Management
 - **Async Processing**: Background task execution with progress tracking
