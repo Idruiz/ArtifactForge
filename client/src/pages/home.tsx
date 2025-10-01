@@ -111,14 +111,17 @@ export default function Home() {
   );
 
   // ---------- speak assistant replies (both normal and Car Mode) ----------
+  const lastSpokenIdRef = useRef<string>("");
+  
   useEffect(() => {
     if ((voiceEnabled || isCarMode) && wsMessages.length > 0) {
       const last = wsMessages[wsMessages.length - 1];
-      if (last.role === "assistant" && last.status === "completed") {
+      if (last.role === "assistant" && last.status === "completed" && last.id !== lastSpokenIdRef.current) {
+        lastSpokenIdRef.current = last.id;
         speak(last.content);
       }
     }
-  }, [wsMessages, voiceEnabled, isCarMode, speak]);
+  }, [wsMessages, voiceEnabled, isCarMode]);
 
   // ---------- handlers ----------
   const handleSendMessage = () => {

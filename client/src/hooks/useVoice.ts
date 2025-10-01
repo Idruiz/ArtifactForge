@@ -28,6 +28,7 @@ export function useVoice(
   
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const currentTranscriptRef = useRef<string>("");
+  const recRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
     const SR: any =
@@ -37,19 +38,20 @@ export function useVoice(
 
     setIsSupported(true);
     const rec: SpeechRecognition = new SR();
+    recRef.current = rec;
     rec.lang = "en-US";
-    rec.continuous = isCarMode; // Only continuous in car mode
-    rec.interimResults = isCarMode; // Only interim in car mode
+    rec.continuous = isCarMode;
+    rec.interimResults = isCarMode;
 
     rec.onresult = (e: any) => {
-      // Get only the new transcript (latest result)
-      const latestIndex = e.resultIndex;
-      const latestResult = e.results[latestIndex];
-      const transcript = latestResult[0].transcript;
-      
       if (isCarMode && onCarModeAutoSend) {
-        // Car Mode: accumulate and set silence timer
-        currentTranscriptRef.current = transcript;
+        // Car Mode: build full transcript from all results
+        let fullTranscript = "";
+        for (let i = 0; i < e.results.length; i++) {
+          fullTranscript += e.results[i][0].transcript;
+        }
+        
+        currentTranscriptRef.current = fullTranscript;
         
         // Clear existing silence timer
         if (silenceTimerRef.current) {
@@ -58,35 +60,37 @@ export function useVoice(
         
         // Start 3-second silence timer
         silenceTimerRef.current = setTimeout(() => {
-          if (currentTranscriptRef.current) {
-            onCarModeAutoSend(currentTranscriptRef.current);
-            // Reset transcript and restart recognition to clear buffer
+          const finalText = currentTranscriptRef.current.trim();
+          if (finalText) {
+            onCarModeAutoSend(finalText);
             currentTranscriptRef.current = "";
+            // Stop and restart to clear buffer - onend will handle restart
             try {
-              rec.stop();
-              setTimeout(() => {
-                try {
-                  rec.start();
-                } catch (err) {
-                  console.error("Error restarting recognition:", err);
-                }
-              }, 100);
+              if (rec === recRef.current) {
+                rec.stop();
+              }
             } catch (err) {
               console.error("Error stopping recognition:", err);
             }
           }
         }, 3000);
       } else {
-        // Normal mode - immediate callback and stop
+        // Normal mode - get final transcript and stop
+        const latestIndex = e.resultIndex;
+        const transcript = e.results[latestIndex][0].transcript;
         onResult(transcript);
         rec.stop();
         setIsListening(false);
       }
     };
     
+    rec.onstart = () => {
+      setIsListening(true);
+    };
+    
     rec.onend = () => {
-      if (isCarMode) {
-        // Restart listening in car mode
+      if (isCarMode && rec === recRef.current) {
+        // Only restart if this is the current recognition in car mode
         try {
           rec.start();
         } catch (e: any) {
@@ -109,8 +113,20 @@ export function useVoice(
 
     setRecognition(rec);
     
+    // Start immediately if in car mode
+    if (isCarMode && !isListening) {
+      try {
+        rec.start();
+        setIsListening(true);
+      } catch (e) {
+        console.error("Failed to start recognition:", e);
+      }
+    }
+    
     // Clean up on unmount or when car mode changes
     return () => {
+      // Prevent auto-restart during cleanup
+      rec.onend = null;
       try {
         rec.stop();
       } catch (e) {
@@ -140,8 +156,7 @@ export function useVoice(
   const startCarMode = useCallback(() => {
     if (recognition && !isListening) {
       setIsCarMode(true);
-      recognition.start();
-      setIsListening(true);
+      // Effect will handle starting the new recognition
     }
   }, [recognition, isListening]);
 

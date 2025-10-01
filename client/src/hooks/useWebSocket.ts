@@ -27,6 +27,8 @@ export function useWebSocket(sessionId: string): UseWebSocketReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptsRef = useRef(0);
 
   const sendMessage = useCallback((message: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -35,63 +37,80 @@ export function useWebSocket(sessionId: string): UseWebSocketReturn {
   }, []);
 
   useEffect(() => {
-    const wsUrl = window.location.origin // e.g. https://your‑app.replit.dev
-      .replace(/^http/, "ws") // → wss://your‑app.replit.dev
-      .concat("/ws"); // → wss://your‑app.replit.dev/ws
+    const wsUrl = window.location.origin
+      .replace(/^http/, "ws")
+      .concat("/ws");
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    const connect = () => {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      setIsConnected(true);
-      // Join session
-      ws.send(JSON.stringify({ type: "join", sessionId }));
-    };
+      ws.onopen = () => {
+        setIsConnected(true);
+        reconnectAttemptsRef.current = 0;
+        ws.send(JSON.stringify({ type: "join", sessionId }));
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const message: WebSocketMessage = JSON.parse(event.data);
+      ws.onmessage = (event) => {
+        try {
+          const message: WebSocketMessage = JSON.parse(event.data);
 
-        switch (message.type) {
-          case "log": {
-            const entry = {
-              ...message.data,
-              // ensure timestamp is a Date instance
-              timestamp: new Date(message.data.timestamp),
-            };
-            setLogs((prev) => [...prev, entry]);
-            break;
+          switch (message.type) {
+            case "log": {
+              const entry = {
+                ...message.data,
+                timestamp: new Date(message.data.timestamp),
+              };
+              setLogs((prev) => [...prev, entry]);
+              break;
+            }
+
+            case "status":
+              setAgentStatus(message.data);
+              break;
+            case "artifact":
+              setArtifacts((prev) => [...prev, message.data]);
+              break;
+            case "message":
+              setMessages((prev) => [...prev, message.data]);
+              break;
+            case "error":
+              console.error("WebSocket error:", message.data);
+              break;
           }
-
-          case "status":
-            setAgentStatus(message.data);
-            break;
-          case "artifact":
-            setArtifacts((prev) => [...prev, message.data]);
-            break;
-          case "message":
-            setMessages((prev) => [...prev, message.data]);
-            break;
-          case "error":
-            console.error("WebSocket error:", message.data);
-            break;
+        } catch (error) {
+          console.error("Failed to parse WebSocket message:", error);
         }
-      } catch (error) {
-        console.error("Failed to parse WebSocket message:", error);
-      }
+      };
+
+      ws.onclose = () => {
+        setIsConnected(false);
+        
+        // Auto-reconnect with exponential backoff
+        if (reconnectAttemptsRef.current < 10) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+          reconnectAttemptsRef.current++;
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log(`Reconnecting... (attempt ${reconnectAttemptsRef.current})`);
+            connect();
+          }, delay);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        setIsConnected(false);
+      };
     };
 
-    ws.onclose = () => {
-      setIsConnected(false);
-    };
-
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      setIsConnected(false);
-    };
+    connect();
 
     return () => {
-      ws.close();
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      wsRef.current?.close();
     };
   }, [sessionId]);
 

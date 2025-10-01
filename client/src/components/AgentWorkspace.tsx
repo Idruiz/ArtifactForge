@@ -79,10 +79,10 @@ export function AgentWorkspace(p: Props) {
     const container = chatContainerRef.current;
     if (!container) return;
     
-    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
-    if (isNearBottom) {
-      chatEndRef.current?.scrollIntoView({ behavior: "instant" as any });
-    }
+    // Always scroll to bottom on new messages
+    setTimeout(() => {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   }, [p.messages]);
 
   useEffect(() => {
