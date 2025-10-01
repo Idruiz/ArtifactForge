@@ -31,6 +31,7 @@ interface AgentTask {
 type BuilderFormat =
   | "pptx"
   | "html"
+  | "website"
   | "docx"
   | "rtf"
   | "txt"

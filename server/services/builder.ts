@@ -68,6 +68,7 @@ export interface BuildOptions {
   format:
     | "pptx"
     | "html"
+    | "website"
     | "docx"
     | "rtf"
     | "txt"
