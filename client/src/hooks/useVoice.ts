@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 
+type CarModeState = "IDLE" | "LISTENING" | "TRANSCRIBING" | "SENDING" | "THINKING" | "SPEAKING";
+
 interface UseVoiceReturn {
   isListening: boolean;
   isSupported: boolean;
@@ -10,6 +12,7 @@ interface UseVoiceReturn {
   startCarMode: () => void;
   stopCarMode: () => void;
   isCarMode: boolean;
+  carModeState: CarModeState;
 }
 
 export function useVoice(
@@ -22,13 +25,22 @@ export function useVoice(
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [isCarMode, setIsCarMode] = useState(false);
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(
-    null,
-  );
+  const [carModeState, setCarModeState] = useState<CarModeState>("IDLE");
+  const [recognition, setRecognition] = useState<any>(null);
   
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const currentTranscriptRef = useRef<string>("");
-  const recRef = useRef<SpeechRecognition | null>(null);
+  const recRef = useRef<any>(null);
+  const carModeStateRef = useRef<CarModeState>("IDLE");
+  const thinkingWatchdogRef = useRef<NodeJS.Timeout | null>(null);
+
+  // FSM transition helper
+  const transitionTo = useCallback((newState: CarModeState) => {
+    const oldState = carModeStateRef.current;
+    console.log(`[Car Mode FSM] ${oldState} → ${newState}`);
+    carModeStateRef.current = newState;
+    setCarModeState(newState);
+  }, []);
 
   useEffect(() => {
     const SR: any =
@@ -37,7 +49,7 @@ export function useVoice(
     if (!SR) return;
 
     setIsSupported(true);
-    const rec: SpeechRecognition = new SR();
+    const rec: any = new SR();
     recRef.current = rec;
     rec.lang = "en-US";
     rec.continuous = isCarMode;
@@ -45,6 +57,11 @@ export function useVoice(
 
     rec.onresult = (e: any) => {
       if (isCarMode && onCarModeAutoSend) {
+        // LISTENING → TRANSCRIBING
+        if (carModeStateRef.current === "LISTENING") {
+          transitionTo("TRANSCRIBING");
+        }
+
         // Car Mode: build full transcript from all results
         let fullTranscript = "";
         for (let i = 0; i < e.results.length; i++) {
@@ -61,9 +78,33 @@ export function useVoice(
         // Start 3-second silence timer
         silenceTimerRef.current = setTimeout(() => {
           const finalText = currentTranscriptRef.current.trim();
-          if (finalText) {
+          if (finalText && carModeStateRef.current === "TRANSCRIBING") {
+            // TRANSCRIBING → SENDING
+            transitionTo("SENDING");
+            
             onCarModeAutoSend(finalText);
             currentTranscriptRef.current = "";
+            
+            // SENDING → THINKING (waiting for assistant response)
+            transitionTo("THINKING");
+            
+            // Start watchdog timer for stuck THINKING state (90s)
+            thinkingWatchdogRef.current = setTimeout(() => {
+              if (carModeStateRef.current === "THINKING") {
+                console.warn("[Car Mode FSM] Watchdog: THINKING timeout, returning to IDLE");
+                transitionTo("IDLE");
+                // Try to restart recognition
+                if (rec === recRef.current && !isListening) {
+                  try {
+                    rec.start();
+                    setIsListening(true);
+                  } catch (e) {
+                    console.error("Watchdog restart failed:", e);
+                  }
+                }
+              }
+            }, 90000);
+            
             // Stop and restart to clear buffer - onend will handle restart
             try {
               if (rec === recRef.current) {
@@ -86,21 +127,29 @@ export function useVoice(
     
     rec.onstart = () => {
       setIsListening(true);
+      if (isCarMode && carModeStateRef.current === "IDLE") {
+        transitionTo("LISTENING");
+      }
     };
     
     rec.onend = () => {
+      // Always reset isListening first
+      setIsListening(false);
+      
       if (isCarMode && rec === recRef.current) {
-        // Only restart if this is the current recognition in car mode
-        try {
-          rec.start();
-        } catch (e: any) {
-          if (e.message && !e.message.includes("already started")) {
-            console.error("Error restarting recognition:", e);
-            setIsListening(false);
+        // Restart if in LISTENING, TRANSCRIBING, or IDLE for reliability
+        const state = carModeStateRef.current;
+        if (state === "LISTENING" || state === "TRANSCRIBING" || state === "IDLE") {
+          try {
+            rec.start();
+            setIsListening(true);
+          } catch (e: any) {
+            if (e.message && !e.message.includes("already started")) {
+              console.error("Error restarting recognition:", e);
+              transitionTo("IDLE");
+            }
           }
         }
-      } else {
-        setIsListening(false);
       }
     };
     
@@ -108,6 +157,9 @@ export function useVoice(
       if (e.error !== "no-speech" && e.error !== "aborted") {
         console.error("Recognition error:", e);
         setIsListening(false);
+        if (isCarMode) {
+          transitionTo("IDLE");
+        }
       }
     };
 
@@ -132,11 +184,16 @@ export function useVoice(
       } catch (e) {
         // Ignore errors when stopping
       }
+      // Reset isListening to allow autostart on next effect run
+      setIsListening(false);
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
+      if (thinkingWatchdogRef.current) {
+        clearTimeout(thinkingWatchdogRef.current);
+      }
     };
-  }, [onResult, isCarMode, onCarModeAutoSend]);
+  }, [onResult, isCarMode, onCarModeAutoSend, transitionTo]);
 
   const startListening = useCallback(() => {
     if (recognition && !isListening) {
@@ -154,21 +211,24 @@ export function useVoice(
   }, [recognition]);
 
   const startCarMode = useCallback(() => {
-    if (recognition && !isListening) {
-      setIsCarMode(true);
-      // Effect will handle starting the new recognition
-    }
-  }, [recognition, isListening]);
+    setIsCarMode(true);
+    transitionTo("IDLE");
+    // Effect will handle creating/starting recognition when ready
+  }, [transitionTo]);
 
   const stopCarMode = useCallback(() => {
     setIsCarMode(false);
+    transitionTo("IDLE");
     recognition?.stop();
     setIsListening(false);
     currentTranscriptRef.current = "";
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
     }
-  }, [recognition]);
+    if (thinkingWatchdogRef.current) {
+      clearTimeout(thinkingWatchdogRef.current);
+    }
+  }, [recognition, transitionTo]);
 
   // ──────────────────────────────────────────────
   // Text‑to‑speech via OpenAI TTS endpoint
@@ -177,11 +237,22 @@ export function useVoice(
 
   const speak = useCallback(async (text: string) => {
     try {
+      // Clear watchdog timer when speak is called
+      if (thinkingWatchdogRef.current) {
+        clearTimeout(thinkingWatchdogRef.current);
+        thinkingWatchdogRef.current = null;
+      }
+      
+      // THINKING → SPEAKING (when assistant reply is ready to be spoken)
+      if (carModeStateRef.current === "THINKING") {
+        transitionTo("SPEAKING");
+      }
+      
       setIsSpeaking(true);
       const r = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: "alloy" }), // you can change to "echo", "nova"…
+        body: JSON.stringify({ text, voice: "alloy" }),
       });
       if (!r.ok) throw new Error(`TTS ${r.status}`);
       const blob = await r.blob();
@@ -190,17 +261,41 @@ export function useVoice(
       audio.onended = () => {
         URL.revokeObjectURL(url);
         setIsSpeaking(false);
+        
+        // SPEAKING → IDLE → LISTENING (restart cycle)
+        if (isCarMode && carModeStateRef.current === "SPEAKING") {
+          transitionTo("IDLE");
+          // Explicitly restart recognition (isListening should be false by now from onend)
+          if (recRef.current) {
+            try {
+              recRef.current.start();
+              setIsListening(true);
+            } catch (e) {
+              console.error("Failed to restart recognition after TTS:", e);
+            }
+          }
+        }
       };
       audio.onerror = () => {
         URL.revokeObjectURL(url);
         setIsSpeaking(false);
+        
+        // Error recovery: return to IDLE
+        if (isCarMode) {
+          transitionTo("IDLE");
+        }
       };
       audio.play();
     } catch (err) {
       console.error("[tts]", err);
       setIsSpeaking(false);
+      
+      // Error recovery: return to IDLE
+      if (isCarMode) {
+        transitionTo("IDLE");
+      }
     }
-  }, []);
+  }, [isCarMode, transitionTo]);
 
   return {
     isListening,
@@ -212,5 +307,6 @@ export function useVoice(
     startCarMode,
     stopCarMode,
     isCarMode,
+    carModeState,
   };
 }
