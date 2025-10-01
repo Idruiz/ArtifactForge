@@ -160,43 +160,29 @@ export default function Home() {
   const handleQuickAction = (action: string) => {
     const prompts: Record<string, string> = {
       presentation:
-        "Create a professional presentation with multiple slides including charts and images",
+        "Create a professional PPTX presentation about [YOUR TOPIC] with slides including charts and images",
       report:
-        "Generate a comprehensive research report with data analysis and visualizations",
-      website: "Build a complete website with multiple pages and modern design",
+        "Generate a comprehensive DOCX report about [YOUR TOPIC] with data analysis and visualizations",
+      website: "Build a complete HTML website about [YOUR TOPIC] with multiple pages and modern design",
       analyze:
-        "Analyze the provided data and create insights with charts and summaries",
+        "Analyze [YOUR DATA/TOPIC] and create insights with charts and summaries in DOCX format",
     };
     const prompt = prompts[action] || "";
     if (prompt) {
       setChatInput(prompt);
-      // Auto-send the message
+      setActiveTab("chat");
+      // Focus the input so user can immediately edit
       setTimeout(() => {
-        if (prompt) {
-          setUserMessages((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              role: "user",
-              content: prompt,
-              timestamp: new Date(),
-              status: "completed",
-            },
-          ]);
-          sendMessage({
-            type: "chat",
-            data: {
-              sessionId,
-              content: prompt,
-              persona,
-              tone,
-              contentAgentEnabled,
-              apiKeys,
-              conversationHistory: allMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
-            },
-          });
-          setChatInput("");
-          setActiveTab("chat");
+        const input = document.querySelector<HTMLTextAreaElement>('textarea[data-testid="input-chat"]');
+        if (input) {
+          input.focus();
+          // Select [YOUR TOPIC] or [YOUR DATA/TOPIC] placeholder for easy replacement
+          const placeholderMatch = prompt.match(/\[YOUR[^\]]+\]/);
+          if (placeholderMatch) {
+            const start = prompt.indexOf(placeholderMatch[0]);
+            const end = start + placeholderMatch[0].length;
+            input.setSelectionRange(start, end);
+          }
         }
       }, 100);
     }

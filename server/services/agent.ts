@@ -357,19 +357,39 @@ class AgentService {
     const picks: BuilderFormat[] = [];
     const wants = (k: string) => p.includes(k);
 
+    // Check formats in priority order (most specific first)
     if (wants("dashboard")) picks.push("dashboard");
     if (wants("infographic")) picks.push("infographic");
-    if (wants("report")) picks.push("report");
-    if (wants("docx") || wants("word")) picks.push("docx");
+    
+    // Website/HTML detection
+    if (wants("html") || wants("website") || wants("web page") || wants("web app")) picks.push("html");
+    
+    // Document formats
+    if (wants("docx") || wants("word") || wants("document")) picks.push("docx");
     if (wants("markdown") || wants("md file")) picks.push("md");
-    if (wants("html")) picks.push("html");
-    if (wants("csv")) picks.push("csv");
+    
+    // Data formats
+    if (wants("csv") || wants("spreadsheet") || wants("data export")) picks.push("csv");
+    
+    // Text formats
     if (wants("txt") || wants("text file")) picks.push("txt");
     if (wants("rtf")) picks.push("rtf");
-    if (wants("ppt") || wants("pptx") || wants("slides") || wants("presentation")) picks.push("pptx");
+    
+    // Report (check for "report" but not as part of other words)
+    if (wants("report")) picks.push("report");
+    
+    // Presentation (check last so it doesn't override more specific formats)
+    if (wants("ppt") || wants("pptx") || wants("slides") || wants("presentation") || wants("powerpoint")) picks.push("pptx");
 
-    // If none specified, default to a polished deck + a brief report
-    if (picks.length === 0) return ["pptx", "report"];
+    // If none specified, infer from context
+    if (picks.length === 0) {
+      // Check for analysis/data context - likely wants report
+      if (wants("analy") || wants("research") || wants("study") || wants("insights")) {
+        return ["docx", "md"];
+      }
+      // Default to presentation + report
+      return ["pptx", "report"];
+    }
 
     // Always keep order unique and sane
     const seen = new Set<BuilderFormat>();

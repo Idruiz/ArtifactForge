@@ -138,9 +138,9 @@ export function AgentWorkspace(p: Props) {
             ))}
           </div>
 
-          {/* Output Formats - Compact */}
+          {/* Output Formats - Compact (supported formats only) */}
           <div className="flex items-center gap-2">
-            {["PPTX", "PDF", "DOCX", "HTML", "CSV", "MD"].map((f) => (
+            {["PPTX", "DOCX", "HTML", "CSV", "MD"].map((f) => (
               <Badge key={f} variant="outline" className="text-xs">
                 {f}
               </Badge>
