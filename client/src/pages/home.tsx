@@ -62,22 +62,63 @@ export default function Home() {
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
-  // ---------- voice hook ----------
-  const { isListening, isSupported, startListening, speak } = useVoice(
+  // ---------- voice hook with Car Mode support ----------
+  const { 
+    isListening, 
+    isSupported, 
+    startListening, 
+    speak, 
+    startCarMode, 
+    stopCarMode, 
+    isCarMode 
+  } = useVoice(
     (text) => {
+      // Normal voice input - append to chat input
       setChatInput((prev) => prev + (prev ? " " : "") + text);
     },
+    (text) => {
+      // Car Mode auto-send callback (triggered after 3 seconds of silence)
+      if (!text.trim()) return;
+
+      // Store user message
+      setUserMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: text,
+          timestamp: new Date(),
+          status: "completed",
+        },
+      ]);
+
+      // Send to server
+      sendMessage({
+        type: "chat",
+        data: {
+          sessionId,
+          content: text,
+          persona,
+          tone,
+          contentAgentEnabled,
+          apiKeys,
+          conversationHistory: allMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+        },
+      });
+
+      setActiveTab("chat");
+    }
   );
 
-  // ---------- speak assistant replies ----------
+  // ---------- speak assistant replies (both normal and Car Mode) ----------
   useEffect(() => {
-    if (voiceEnabled && wsMessages.length > 0) {
+    if ((voiceEnabled || isCarMode) && wsMessages.length > 0) {
       const last = wsMessages[wsMessages.length - 1];
       if (last.role === "assistant" && last.status === "completed") {
         speak(last.content);
       }
     }
-  }, [wsMessages, voiceEnabled, speak]);
+  }, [wsMessages, voiceEnabled, isCarMode, speak]);
 
   // ---------- handlers ----------
   const handleSendMessage = () => {
@@ -198,6 +239,7 @@ export default function Home() {
         contentAgentEnabled={contentAgentEnabled}
         chatInput={chatInput}
         isListening={isListening}
+        isCarMode={isCarMode}
         onPersonaChange={setPersona}
         onToneChange={setTone}
         onVoiceToggle={setVoiceEnabled}
@@ -215,6 +257,18 @@ export default function Home() {
                   variant: "destructive",
                 })
         }
+        onStartCarMode={
+          isSupported
+            ? startCarMode
+            : () =>
+                toast({
+                  title: "Voice input not supported",
+                  description:
+                    "Your browser doesn't support speech recognition.",
+                  variant: "destructive",
+                })
+        }
+        onStopCarMode={stopCarMode}
         onShowApiKeys={() => setShowApiKeysModal(true)}
         onRestartAgent={handleRestartAgent}
       />

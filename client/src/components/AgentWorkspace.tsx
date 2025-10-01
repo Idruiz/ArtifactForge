@@ -69,16 +69,30 @@ export function AgentWorkspace(p: Props) {
       }) as Record<string, string>
     )[type.toLowerCase()] || "📁";
 
-  /* ─── auto-scroll ─── */
+  /* ─── auto-scroll only when near bottom ─── */
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "instant" as any });
+    const container = chatContainerRef.current;
+    if (!container) return;
+    
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+    if (isNearBottom) {
+      chatEndRef.current?.scrollIntoView({ behavior: "instant" as any });
+    }
   }, [p.messages]);
 
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "instant" as any });
+    const container = logContainerRef.current;
+    if (!container) return;
+    
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+    if (isNearBottom) {
+      logEndRef.current?.scrollIntoView({ behavior: "instant" as any });
+    }
   }, [p.logs]);
 
   return (
@@ -168,7 +182,7 @@ export function AgentWorkspace(p: Props) {
 
           {/* CHAT */}
           <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
-            <div className="h-full overflow-y-auto overflow-x-hidden p-4 md:p-6 scrollbar-visible" style={{ WebkitOverflowScrolling: "touch" }}>
+            <div ref={chatContainerRef} className="h-full overflow-y-scroll overflow-x-hidden p-4 md:p-6 scrollbar-visible" style={{ WebkitOverflowScrolling: "touch" }}>
               <div className="space-y-4 max-w-4xl">
                 {p.messages.map((m) => {
                   const bg =
@@ -258,7 +272,7 @@ export function AgentWorkspace(p: Props) {
 
           {/* LOGS */}
           <TabsContent value="logs" className="flex-1 m-0 overflow-hidden">
-            <div className="h-full overflow-y-auto overflow-x-hidden bg-slate-900 text-green-400 font-mono text-xs md:text-sm scrollbar-visible" style={{ WebkitOverflowScrolling: "touch" }}>
+            <div ref={logContainerRef} className="h-full overflow-y-scroll overflow-x-hidden bg-slate-900 text-green-400 font-mono text-xs md:text-sm scrollbar-visible" style={{ WebkitOverflowScrolling: "touch" }}>
               <div className="p-4 space-y-1">
                 {p.logs.map((l) => {
                   // ── guard: ensure ts is Date

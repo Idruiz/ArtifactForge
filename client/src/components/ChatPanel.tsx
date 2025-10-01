@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Mic, Key, RotateCcw, Zap } from 'lucide-react';
+import { Mic, Key, RotateCcw, Zap, Car } from 'lucide-react';
 import { Persona, Tone, ApiKeys } from '@/lib/types';
 
 interface ChatPanelProps {
@@ -16,6 +16,7 @@ interface ChatPanelProps {
   contentAgentEnabled: boolean;
   chatInput: string;
   isListening: boolean;
+  isCarMode: boolean;
   onPersonaChange: (persona: Persona) => void;
   onToneChange: (tone: Tone) => void;
   onVoiceToggle: (enabled: boolean) => void;
@@ -23,6 +24,8 @@ interface ChatPanelProps {
   onChatInputChange: (input: string) => void;
   onSendMessage: () => void;
   onStartVoiceInput: () => void;
+  onStartCarMode: () => void;
+  onStopCarMode: () => void;
   onShowApiKeys: () => void;
   onRestartAgent: () => void;
 }
@@ -35,6 +38,7 @@ export function ChatPanel({
   contentAgentEnabled,
   chatInput,
   isListening,
+  isCarMode,
   onPersonaChange,
   onToneChange,
   onVoiceToggle,
@@ -42,6 +46,8 @@ export function ChatPanel({
   onChatInputChange,
   onSendMessage,
   onStartVoiceInput,
+  onStartCarMode,
+  onStopCarMode,
   onShowApiKeys,
   onRestartAgent,
 }: ChatPanelProps) {
@@ -138,6 +144,20 @@ export function ChatPanel({
               data-testid="switch-content-agent"
             />
             <span className="text-xs text-slate-500">{contentAgentEnabled ? "ON (Always Generate)" : "OFF (Auto-Detect)"}</span>
+          </div>
+
+          {/* Car Mode Toggle */}
+          <div className="flex items-center space-x-2">
+            <Car className={`w-4 h-4 ${isCarMode ? 'text-red-500' : 'text-slate-400'}`} />
+            <Label className="text-sm font-medium" title="Hands-free mode: Speak and pause 3 seconds to auto-send. Responses are spoken automatically.">
+              Car Mode:
+            </Label>
+            <Switch 
+              checked={isCarMode} 
+              onCheckedChange={(enabled) => enabled ? onStartCarMode() : onStopCarMode()}
+              data-testid="switch-car-mode"
+            />
+            {isCarMode && <span className="text-xs text-red-500 font-medium animate-pulse">LISTENING</span>}
           </div>
         </div>
 

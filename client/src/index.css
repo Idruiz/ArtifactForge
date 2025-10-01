@@ -64,27 +64,35 @@
     scroll-behavior: auto !important;
   }
 
-  /* Visible scrollbars */
+  /* Force visible scrollbars - ALWAYS VISIBLE */
   .scrollbar-visible {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+    scrollbar-width: auto;
+    scrollbar-color: #4a5568 #e2e8f0;
+    overflow-y: scroll !important;
   }
 
   .scrollbar-visible::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 12px;
+    height: 12px;
+    -webkit-appearance: none;
   }
 
   .scrollbar-visible::-webkit-scrollbar-track {
-    background: transparent;
+    background: #e2e8f0;
+    border-radius: 6px;
   }
 
   .scrollbar-visible::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
+    background: #4a5568;
+    border-radius: 6px;
+    border: 2px solid #e2e8f0;
   }
 
   .scrollbar-visible::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.5);
+    background: #2d3748;
+  }
+
+  .scrollbar-visible::-webkit-scrollbar-thumb:active {
+    background: #1a202c;
   }
 }
