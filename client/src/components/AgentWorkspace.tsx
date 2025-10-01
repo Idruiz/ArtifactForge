@@ -67,7 +67,7 @@ export function AgentWorkspace(p: Props) {
         csv: "📈",
         md: "📋",
       }) as Record<string, string>
-    )[type.toLowerCase()] || "📁";
+    )[type?.toLowerCase() || ""] || "📁";
 
   /* --- auto-scroll only when near bottom --- */
   const chatEndRef = useRef<HTMLDivElement>(null);
