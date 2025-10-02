@@ -2507,302 +2507,341 @@ function doOptions(e) {
     slides: any[],
     sources?: string[],
   ): Promise<BuildResult> {
+    await logger.stepStart(taskId, "Building multi-page website with admin panel");
     const theme = deriveTheme(title);
     
-    // Sanitize all content to prevent system/prompt leaks
-    const heroText = sanitizeContent(slides?.[0]?.content?.subtitle || slides?.[0]?.content?.body || "Welcome to our website");
-    const heroImage = slides?.[0]?.content?.image?.url || "";
+    // Distribute slides across pages: Home, About, Projects, Contact
+    const sections = this.distributeSlidesToWebsitePages(slides);
     
-    const sections = (slides || []).slice(1).map((s: any, i: number) => ({
-      id: `section-${i + 1}`,
-      heading: sanitizeContent(s?.title ? String(s.title) : `Section ${i + 1}`),
-      body: sanitizeContent(s?.content?.subtitle ? String(s.content.subtitle) : (s?.content?.body ? String(s.content.body) : "")),
-      bullets: Array.isArray(s?.content?.bullets) ? s.content.bullets.map((b: string) => sanitizeContent(b)) : [],
-      image: s?.content?.image?.url || "",
-      chart: s?.content?.chart?.url || "",
-    })).slice(0, 10);
+    // Generate shared CSS
+    const stylesCSS = this.generateWebsiteCSS(theme);
+    
+    // Generate shared JS (navigation highlighting + admin button logic)
+    const appJS = this.generateWebsiteJS();
+    
+    // Generate individual HTML pages
+    const indexHTML = this.generateWebsitePageHTML('Home', 'index.html', sections.home, theme, title);
+    const aboutHTML = this.generateWebsitePageHTML('About', 'about.html', sections.about, theme, title);
+    const projectsHTML = this.generateWebsitePageHTML('Projects', 'projects.html', sections.projects, theme, title);
+    const contactHTML = this.generateWebsitePageHTML('Contact', 'contact.html', sections.contact, theme, title);
+    
+    // Generate admin panel files
+    const adminHTML = this.generateAdminHTML();
+    const adminJS = this.generateAdminJS();
+    
+    // Generate Apps Script backend
+    const contentApiGS = this.generateAppsScriptBackend();
+    
+    // Create zip bundle
+    const zipFilename = makeFilename(`${title}_Website`, "zip");
+    const zipBuffer = await this.createWebsiteZip({
+      'index.html': indexHTML,
+      'about.html': aboutHTML,
+      'projects.html': projectsHTML,
+      'contact.html': contactHTML,
+      'styles.css': stylesCSS,
+      'app.js': appJS,
+      'admin/index.html': adminHTML,
+      'admin/admin.js': adminJS,
+      'apps_script/ContentApi.gs': contentApiGS,
+    });
+    
+    const filePath = await fileStorage.saveFile(zipFilename, zipBuffer);
+    const { size } = await fileStorage.getFileStats(zipFilename);
+    
+    await logger.stepEnd(taskId, "Built multi-page website bundle");
+    return {
+      filename: zipFilename,
+      fileSize: size,
+      filePath,
+      metadata: {
+        slides: 4,
+        images: 0,
+        charts: 0,
+        theme: theme.name
+      },
+    };
+  }
+  
+  private distributeSlidesToWebsitePages(slides: any[]): {
+    home: any[];
+    about: any[];
+    projects: any[];
+    contact: any[];
+  } {
+    // Distribute slides evenly across sections
+    const total = slides.length;
+    const perPage = Math.ceil(total / 4);
+    
+    return {
+      home: slides.slice(0, perPage),
+      about: slides.slice(perPage, perPage * 2),
+      projects: slides.slice(perPage * 2, perPage * 3),
+      contact: slides.slice(perPage * 3),
+    };
+  }
+  
+  private generateWebsiteCSS(theme: any): string {
+    return `:root {
+  --bg: ${theme.bg};
+  --paper: ${theme.card};
+  --text: ${theme.text};
+  --sub: ${theme.mute};
+  --accent: ${theme.a};
+  --band: ${theme.b};
+}
 
-    const navLinks = sections.map(s => 
-      `<a href="#${s.id}">${escapeXml(s.heading)}</a>`
-    ).join("");
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-    const sectionsHtml = sections.map((sec) => {
-      const bulletsHtml = sec.bullets.length
-        ? '<ul>' + sec.bullets.map((b: string) => '<li>' + escapeXml(b) + '</li>').join("") + '</ul>'
-        : '';
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+header {
+  background: var(--paper);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+nav {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 2rem;
+}
+
+nav a {
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+nav a:hover {
+  color: var(--accent);
+}
+
+nav a.active {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 4px;
+}
+
+.admin-btn {
+  background: var(--accent);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-decoration: none;
+  display: none;
+}
+
+.admin-btn.visible {
+  display: inline-block;
+}
+
+main {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+
+.hero {
+  text-align: center;
+  padding: 4rem 0;
+  background: linear-gradient(135deg, var(--accent), var(--band));
+  color: white;
+  border-radius: 16px;
+  margin-bottom: 3rem;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+.section {
+  background: var(--paper);
+  padding: 2.5rem;
+  margin-bottom: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.section h2 {
+  color: var(--text);
+  margin-bottom: 1rem;
+  font-size: 1.8rem;
+}
+
+.section .band {
+  width: 80px;
+  height: 4px;
+  background: var(--band);
+  margin-bottom: 1.5rem;
+  border-radius: 2px;
+}
+
+.section p {
+  color: var(--sub);
+  margin-bottom: 1rem;
+}
+
+.section ul {
+  list-style: disc;
+  margin-left: 1.5rem;
+  color: var(--sub);
+}
+
+.section ul li {
+  margin-bottom: 0.5rem;
+}
+
+.section img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+footer {
+  text-align: center;
+  padding: 2rem;
+  color: var(--sub);
+  margin-top: 4rem;
+}
+
+@media (max-width: 768px) {
+  nav ul {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .hero h1 {
+    font-size: 2rem;
+  }
+  
+  main {
+    padding: 0 1rem;
+  }
+}`;
+  }
+  
+  private generateWebsiteJS(): string {
+    return `// Active nav highlighting
+document.addEventListener('DOMContentLoaded', () => {
+  const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+  const links = document.querySelectorAll('nav a[href]');
+  
+  links.forEach(link => {
+    const href = link.getAttribute('href');
+    if (href === currentPage || (currentPage === '' && href === 'index.html')) {
+      link.classList.add('active');
+    }
+  });
+  
+  // Show admin button if ?admin=1 or localStorage.adminToken exists
+  const params = new URLSearchParams(window.location.search);
+  const hasAdminParam = params.get('admin') === '1';
+  const hasToken = !!localStorage.getItem('adminToken');
+  
+  if (hasAdminParam || hasToken) {
+    const adminBtn = document.querySelector('.admin-btn');
+    if (adminBtn) {
+      adminBtn.classList.add('visible');
+    }
+  }
+});`;
+  }
+  
+  private generateWebsitePageHTML(
+    pageName: string,
+    currentFile: string,
+    slides: any[],
+    theme: any,
+    siteTitle: string
+  ): string {
+    const sectionsHTML = slides.map((slide) => {
+      const c = slide.content || {};
+      const heading = sanitizeContent(slide.title || pageName);
+      const body = sanitizeContent(c.subtitle || c.body || '');
+      const bullets = Array.isArray(c.bullets) ? c.bullets.map((b: string) => sanitizeContent(b)) : [];
+      const imageUrl = c.image?.url || '';
       
-      const mediaHtml = sec.image 
-        ? `<img src="${sec.image}" alt="${escapeXml(sec.heading)}" loading="lazy" />`
-        : (sec.chart ? `<img src="${sec.chart}" alt="Chart for ${escapeXml(sec.heading)}" loading="lazy" />` : '');
-
-      const hasMedia = !!(sec.image || sec.chart);
-      const bodyText = sec.body ? '<p>' + escapeXml(sec.body).replace(/\n/g, '<br/>') + '</p>' : '';
-
       return `
-        <section id="${sec.id}" class="content-section ${hasMedia ? 'split' : ''}">
-          <div class="section-content">
-            <h2>${escapeXml(sec.heading)}</h2>
-            ${bodyText}
-            ${bulletsHtml}
-          </div>
-          ${mediaHtml ? `<div class="section-media">${mediaHtml}</div>` : ''}
-        </section>`;
-    }).join("");
-
-    const refsHtml = (sources && sources.length)
-      ? '<div class="references"><h3>References & Sources</h3><ul>' +
-        firstN(sources, 10)
-          .map((s) => '<li><a href="' + s + '" target="_blank" rel="noopener">' + escapeXml(s) + '</a></li>')
-          .join("") +
-        '</ul></div>'
-      : '';
-
-    const html = `<!DOCTYPE html>
+    <div class="section">
+      <h2>${escapeXml(heading)}</h2>
+      <div class="band"></div>
+      ${body ? `<p>${escapeXml(body)}</p>` : ''}
+      ${bullets.length > 0 ? `<ul>${bullets.map((b: string) => `<li>${escapeXml(b)}</li>`).join('')}</ul>` : ''}
+      ${imageUrl ? `<img src="${imageUrl}" alt="${escapeXml(heading)}" loading="lazy">` : ''}
+    </div>`;
+    }).join('');
+    
+    const isHome = pageName === 'Home';
+    const heroText = slides[0]?.content?.subtitle || slides[0]?.content?.body || 'Welcome to our website';
+    
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="${escapeXml(heroText.slice(0, 160))}">
-  <title>${escapeXml(safeTitle(title))}</title>
-  <style>
-    :root {
-      --primary: ${theme.a};
-      --secondary: ${theme.b};
-      --bg: ${theme.bg};
-      --text: ${theme.text};
-      --mute: ${theme.mute};
-      --card: ${theme.card};
-    }
-    
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      line-height: 1.6;
-      color: var(--text);
-      background: var(--bg);
-    }
-    
-    nav {
-      background: var(--card);
-      padding: 1rem 2rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      gap: 2rem;
-    }
-    
-    nav .logo {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--primary);
-    }
-    
-    nav a {
-      color: var(--text);
-      text-decoration: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      transition: all 0.3s ease;
-    }
-    
-    nav a:hover {
-      background: var(--primary);
-      color: white;
-    }
-    
-    .hero {
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      color: white;
-      padding: 5rem 2rem;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .hero h1 {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-    }
-    
-    .hero p {
-      font-size: 1.25rem;
-      max-width: 700px;
-      margin: 0 auto 2rem;
-      opacity: 0.95;
-    }
-    
-    ${heroImage ? `
-    .hero::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: url('${heroImage}') center/cover;
-      opacity: 0.2;
-      z-index: 0;
-    }
-    
-    .hero > * {
-      position: relative;
-      z-index: 1;
-    }
-    ` : ''}
-    
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
-    
-    .content-section {
-      margin: 4rem 0;
-      padding: 3rem;
-      background: var(--card);
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    }
-    
-    .content-section.split {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      align-items: center;
-    }
-    
-    .content-section h2 {
-      font-size: 2rem;
-      margin-bottom: 1rem;
-      color: var(--primary);
-    }
-    
-    .content-section p {
-      margin-bottom: 1rem;
-      color: var(--text);
-    }
-    
-    .content-section ul {
-      list-style: none;
-      padding-left: 0;
-    }
-    
-    .content-section li {
-      padding: 0.5rem 0;
-      padding-left: 1.5rem;
-      position: relative;
-    }
-    
-    .content-section li::before {
-      content: '✓';
-      position: absolute;
-      left: 0;
-      color: var(--primary);
-      font-weight: bold;
-    }
-    
-    .section-media img {
-      width: 100%;
-      height: auto;
-      border-radius: 8px;
-      object-fit: cover;
-    }
-    
-    footer {
-      background: var(--card);
-      padding: 3rem 2rem;
-      margin-top: 4rem;
-      text-align: center;
-      border-top: 3px solid var(--primary);
-    }
-    
-    .references {
-      background: var(--bg);
-      padding: 2rem;
-      border-radius: 8px;
-      margin: 2rem 0;
-    }
-    
-    .references h3 {
-      color: var(--primary);
-      margin-bottom: 1rem;
-    }
-    
-    .references ul {
-      list-style: none;
-      padding: 0;
-    }
-    
-    .references li {
-      padding: 0.5rem 0;
-    }
-    
-    .references a {
-      color: var(--secondary);
-      text-decoration: none;
-      word-break: break-all;
-    }
-    
-    .references a:hover {
-      text-decoration: underline;
-    }
-    
-    @media (max-width: 768px) {
-      .hero h1 { font-size: 2rem; }
-      .hero p { font-size: 1rem; }
-      nav { flex-direction: column; gap: 0.5rem; }
-      .content-section.split {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+  <title>${pageName} - ${escapeXml(sanitizeContent(siteTitle))}</title>
+  <meta name="description" content="${escapeXml(sanitizeContent(siteTitle))} - ${pageName} page">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <nav>
-    <div class="logo">${escapeXml(safeTitle(title))}</div>
-    ${navLinks}
-  </nav>
+  <header>
+    <nav>
+      <ul>
+        <li><a href="index.html" data-testid="nav-home">Home</a></li>
+        <li><a href="about.html" data-testid="nav-about">About</a></li>
+        <li><a href="projects.html" data-testid="nav-projects">Projects</a></li>
+        <li><a href="contact.html" data-testid="nav-contact">Contact</a></li>
+      </ul>
+      <a href="admin/index.html" class="admin-btn" data-testid="btn-admin">Admin</a>
+    </nav>
+  </header>
   
-  <div class="hero">
-    <h1>${escapeXml(safeTitle(title))}</h1>
-    <p>${escapeXml(heroText)}</p>
-  </div>
-  
-  <div class="container">
-    ${sectionsHtml}
-  </div>
+  <main>
+    ${isHome ? `
+    <div class="hero">
+      <h1>${escapeXml(sanitizeContent(siteTitle))}</h1>
+      <p>${escapeXml(sanitizeContent(heroText))}</p>
+    </div>` : ''}
+    
+    ${sectionsHTML}
+  </main>
   
   <footer>
-    ${refsHtml}
-    <p style="margin-top: 2rem; color: var(--mute);">
-      © ${new Date().getFullYear()} ${escapeXml(safeTitle(title))}. Generated by Agent Diaz.
-    </p>
+    <p>&copy; 2025 ${escapeXml(sanitizeContent(siteTitle))}. Generated by Agent Diaz AI.</p>
   </footer>
+  
+  <script src="app.js"></script>
 </body>
 </html>`;
-
-    const filename = makeFilename(`${title}_Website`, "html");
-    const buffer = Buffer.from(html, "utf8");
-    const filePath = await fileStorage.saveFile(filename, buffer);
-    const { size } = await fileStorage.getFileStats(filename);
-
-    await logger.stepEnd(taskId, "Building website");
-    return {
-      filename,
-      fileSize: size,
-      filePath,
-      metadata: {
-        slides: sections.length + 1,
-        images: sections.filter((s) => s.image).length,
-        charts: sections.filter((s) => s.chart).length,
-        theme: theme.name,
-      },
-    };
   }
 
   /* ─────────────────────── Derived fallback charts (donuts only) ─────────────────────── */

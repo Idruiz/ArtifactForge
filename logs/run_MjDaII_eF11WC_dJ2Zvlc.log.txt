@@ -1,0 +1,17 @@
+[2025-10-02T02:25:59.595Z] [step_start] Starting: Planning content generation
+[2025-10-02T02:25:59.599Z] [trace] Generated 4 search queries
+[2025-10-02T02:25:59.603Z] [step_end] Completed: Planning content generation
+[2025-10-02T02:25:59.607Z] [step_start] Starting: Web research
+[2025-10-02T02:26:00.890Z] [trace] Found 24 search results
+[2025-10-02T02:26:00.892Z] [step_end] Completed: Web research
+[2025-10-02T02:26:03.409Z] [step_start] Starting: Generating content outline
+[2025-10-02T02:27:32.799Z] [trace] Generated outline with 13 slides
+[2025-10-02T02:27:32.802Z] [step_end] Completed: Generating content outline
+[2025-10-02T02:27:32.810Z] [step_start] Starting: Processing visual content
+[2025-10-02T02:27:40.735Z] [trace] Visuals → images: 13, charts: 3
+[2025-10-02T02:27:40.738Z] [step_end] Completed: Processing visual content
+[2025-10-02T02:27:40.740Z] [step_start] Starting: Building WEBSITE
+[2025-10-02T02:27:40.745Z] [step_start] Starting: Building website
+[2025-10-02T02:27:40.762Z] [step_end] Completed: Building website
+[2025-10-02T02:27:40.765Z] [step_end] Completed: Building WEBSITE
+[2025-10-02T02:27:40.769Z] [delivery] ✅ Artifacts emitted: Professional_Website_for_Sustainable_Technology_InnovationsWebsite_2025-10-02T02-27-40.html
