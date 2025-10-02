@@ -1,0 +1,73 @@
+TITLE: DELIVER CLICKABLE WEBSITE + ARTIFACTS IN THIS REPLY — NO CLAIMS WITHOUT FILES
+
+READ FIRST — NON-NEGOTIABLE
+Do not say “fixed” unless you: (1) write the files to the repo, (2) attach a downloadable artifact bundle, and (3) post **working clickable links in this chat** that open the pages. If any one of those is missing, it is NOT done.
+
+WHAT TO DELIVER **IN THIS MESSAGE**
+1) **Clickable links (chat)**:
+   - Link to **Home** (/site/index.html), **About** (/site/about.html), **Projects** (/site/projects.html), **Contact** (/site/contact.html).
+   - Also link **LAUNCH.html** at repo root (“🚀 Open Website”).
+   - If a dev server is required, **start it** and provide the **live preview URL**; otherwise use raw-file links.
+
+2) **Website files written to repo** (multi-page, not single page):
+   - `/site/index.html`
+   - `/site/about.html`
+   - `/site/projects.html`
+   - `/site/contact.html`
+   - `/site/styles.css`
+   - `/site/app.js`
+   Rules:
+     • Header nav must route to these separate pages (no hash anchors).
+     • Active nav highlighting persists across pages.
+     • Copy is concise/pro (≤3-word headers).
+     • No prompt/system text leaks.
+
+3) **Root launcher** (non-dev obvious):
+   - `/LAUNCH.html` with giant emoji buttons that open each page and the admin panel.
+
+4) **Admin sub-artifact (fully working)**:
+   - `/admin/index.html`
+   - `/admin/admin.js`
+   - `/apps_script/ContentApi.gs`
+     • `doGet(e)`:
+         GET `/content` → JSON `{ sections: { home:[], about:[], projects:[], contact:[] } }`
+         GET `/admin`  → serves admin panel HTML (optional)
+     • `doPost(e)`:
+         `action` = create|update|delete; `section`; `id`; `title`; `body`; `token`
+     • Use Script Properties for TOKEN. No secrets in client.
+   - Admin tools visible only with `?admin=1` or `localStorage.adminToken`.
+
+5) **Server + scripts**:
+   - `/server.js` serves `/site` and `/LAUNCH.html` at `/`.
+   - `/package.json` includes `"start": "node server.js"`.
+
+6) **Attach the bundles as artifacts**:
+   - Artifact 1: **Website bundle** (`/site` + `/LAUNCH.html`).
+   - Artifact 2: **Admin bundle** (`/admin` + `/apps_script/ContentApi.gs`).
+   - (If your tool requires ZIPs, create and attach ZIPs.)
+
+7) **Inline code blocks**:
+   - Paste the **complete contents** of each file above in separate code blocks.
+
+8) **Verification you actually ran it**:
+   - Start server (if applicable) and post the **live preview URL**.
+   - Paste quick test logs:
+     • Click each header → correct page loaded (not an anchor).  
+     • Leak check passed (no `/system|prompt|instruction/i`).  
+     • Admin CRUD round-trip worked (show request/response log).  
+
+FAIL CONDITIONS (any = reject + redo)
+- Only folders, no files.  
+- Files created but **no clickable links** in this chat.  
+- Single-page site instead of multi-page.  
+- Admin stubbed/disabled.  
+- Any prompt/system text in HTML.  
+- “Fixed” claims without artifacts attached.
+
+SCOPE **ALSO MUST NOT REGRESS**:
+- Car Mode: not stuck in “listening”; 3s VAD → finalize → transcribe → send → respond → idle; single send per utterance; no repeat-last-message loop.
+- DOCX: embedded PNG charts (no raw QuickChart URLs in body); readable styles.
+- Sanitization: zero prompt leaks.
+
+IF BLOCKED
+State exact file + line blocking you, ship a minimal reversible fix behind a feature flag, and proceed. Do **not** downscope or defer deliverables. This message must contain the clickable links + bundles.
