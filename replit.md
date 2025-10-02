@@ -40,6 +40,16 @@ Preferred communication style: Simple, everyday language.
 - ✅ **Reliable restart**: explicit recognition.start() after TTS completes
 - ✅ **State synchronization**: carModeStateRef eliminates dependency issues
 
+### Multi-Page Website with Live Preview (October 2, 2025)
+- ✅ **Express server integration**: server.js serves static files from /site directory on port 3000
+- ✅ **ZIP bundle structure**: /site/ subfolder for website files, server.js and package.json at root
+- ✅ **File-based navigation**: Links use /about.html, /projects.html, /contact.html (not hash routes)
+- ✅ **Clean URL support**: Express extensions option allows /about to resolve to about.html
+- ✅ **Apps Script multi-page router**: doGet() with HtmlService.createHtmlOutputFromFile() for Sheets Web App deployment
+- ✅ **Complete documentation**: README.md with setup, structure, and deployment instructions
+- ✅ **Admin panel included**: Separate /admin directory with token auth and CRUD interface
+- ✅ **Apps Script backend**: /apps_script directory with ContentApi.gs for Google Sheets integration
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -163,12 +173,6 @@ Preferred communication style: Simple, everyday language.
 - `UNSPLASH_ACCESS_KEY`: Optional for better image quality
 
 ## Future Enhancements
-
-### Multi-Page Website Generation (Planned)
-- Archive multiple HTML pages into zip bundles
-- Generate navigation menu linking pages together
-- Shared CSS and assets across pages
-- Support for complex site structures (home, about, services, contact, etc.)
 
 ### Enhanced DOCX Quality (Planned)
 - Proper heading hierarchy (H1, H2, H3)
