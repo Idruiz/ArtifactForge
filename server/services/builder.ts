@@ -983,174 +983,1072 @@ class BuilderService {
     sources: string[],
     hints: LayoutHints = {},
   ): Promise<BuildResult> {
+    await logger.stepStart(taskId, "Building multi-page website with admin panel");
     const theme = pickTheme(title);
-
-    const maxCharts = hints?.maxCharts ?? 4;
-    const allowOneTwoCategory = hints?.allowOneTwoCategory ?? true;
-    const minTwoCatImbalance = hints?.minTwoCatImbalancePct ?? 12;
-
-    const seenSigs = new Set<string>();
-    let twoCatCount = 0;
-    let imgCount = 0;
-    let chartCount = 0;
-    let addedSynthCharts = false;
-    let addedDerivedCharts = 0;
-
-    const expandedSlides: SlideIn[] = [];
-    for (const s of slides) {
-      const c = s.content || {};
-      const text = String(c.subtitle || c.body || "").trim();
-      const pages = paginateBodyText(text, 900);
-      if (pages.length <= 1) {
-        expandedSlides.push(s);
-      } else {
-        pages.forEach((page, idx) => {
-          const suffix = idx === 0 ? "" : ` (cont. ${idx + 1})`;
-          expandedSlides.push({ ...s, title: `${safeTitle(s.title || "Slide")}${suffix}`, content: { ...c, subtitle: page } });
-        });
-      }
-    }
-
-    const refsHtml = sources.length
-      ? `
-    <div class="slide">
-      <h2>References</h2>
-      <div class="cols">
-        <div>${sources.slice(0, Math.ceil(sources.length / 2)).map((s) => `<div>${s}</div>`).join("")}</div>
-        <div>${sources.slice(Math.ceil(sources.length / 2)).map((s) => `<div>${s}</div>`).join("")}</div>
-      </div>
-    </div>`
-      : "";
-
-    const htmlSlides = await Promise.all(expandedSlides.map(async (s) => {
-      const c: any = s.content || {};
-      let out = `<div class="slide">`;
-      if (s.title) out += `<h2>${safeTitle(s.title)}</h2><div class="band"></div>`;
-      const text = c.subtitle || c.body || "";
-      if (text) out += `<p>${String(text).replace(/\n/g, "<br/>")}</p>`;
-      const hasBullets = Array.isArray(c.bullets) && c.bullets.length > 0;
-
-      // Chart normalization + real data
-      let spec: any | null = c.chartSpec ? normalizeToDoughnutSpec(c.chartSpec) : null;
-      if (!spec || !hasUsableChartData(spec)) {
-        const augmented = await maybeAugmentChartSpecFromData(c);
-        if (augmented && hasUsableChartData(augmented)) spec = augmented;
-      }
-
-      // Gate chart
-      let allowTwo = allowOneTwoCategory && twoCatCount < 1;
-      let okToRender = false;
-      let sig = "";
-      if (spec && hasUsableChartData(spec)) {
-        const meaningful = donutIsMeaningful(spec, allowTwo, minTwoCatImbalance);
-        if (meaningful && chartCount < maxCharts) {
-          sig = donutSignature(spec);
-          if (!sig || !seenSigs.has(sig)) okToRender = true;
-        }
-      }
-      const hasChart = okToRender;
-      const hasImage = !!c.image?.url && !(hints.prioritizeCharts && hasChart);
-
-      if (hasBullets) {
-        out += `<ul class="${hasImage || hasChart ? "half" : "full"}">${(c.bullets || []).slice(0, 6).map((b: string) => `<li>${b}</li>`).join("")}</ul>`;
-      }
-      if (hasChart && spec) {
-        out += `<img class="${hasBullets ? "half" : "full"}" src="${chartUrlFromSpec(spec)}" alt="${spec.title || "Chart"}" />`;
-        chartCount++;
-        seenSigs.add(sig);
-        const meta = getDonutMeta(spec);
-        if (meta.isTwo) twoCatCount++;
-      } else if (hasImage) {
-        out += `<img class="${hasBullets ? "half" : "full"}" src="${c.image!.url}" alt="${c.image!.description || ""}" />`;
-        imgCount++;
-      }
-      out += `</div>`;
-      return out;
-    }));
-    const htmlSlidesStr = htmlSlides.join("");
-
-    // Deck-level derived charts if none (respect caps)
-    let derivedHtml = "";
-    if (chartCount < 1) {
-      const derived = await this.buildDataDerivedFallbackCharts(slides, theme); // ← uses local theme
-      for (const d of derived) {
-        if (chartCount >= maxCharts) break;
-        derivedHtml += `<div class="slide"><h2>${d.title}</h2><div class="band"></div><img class="full" src="${d.url}" alt="${d.title}"/></div>`;
-        chartCount++;
-        addedDerivedCharts++;
-      }
-    }
-
-    // Optional synthetic visual
-    let synthHtml = "";
-    if (!hints.disableAutoSummary && chartCount === 0) {
-      addedSynthCharts = true;
-      const spec = normalizeToDoughnutSpec({
-        type: "doughnut",
-        title: "Visual Summary",
-        data: { labels: ["Textual", "Visual"], datasets: [{ data: [1, 1], backgroundColor: multiColorPalette(2) }] },
-      });
-      synthHtml = `
-        <div class="slide"><h2>Visual Summary</h2><div class="band"></div><img class="full" src="${chartUrlFromSpec(spec)}"/></div>
-      `;
-      chartCount += 1;
-    }
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>${safeTitle(title)}</title>
-<style>
-  :root{ --bg:#${theme.bg}; --paper:#${theme.paper}; --text:#${theme.text}; --sub:#${theme.subtext}; --accent:#${theme.accent}; --band:#${theme.band}; }
-  body{ margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto; }
-  .slide{ background:var(--paper); margin:24px auto; padding:40px; max-width:960px; border-radius:14px; box-shadow:0 10px 16px rgba(0,0,0,.08); }
-  .slide h1,.slide h2{ margin:0 0 12px; }
-  .title{ text-align:center; background:linear-gradient(135deg, var(--accent), #7c3aed); color:white; }
-  .title h1{ font-size:44px; margin:0 0 10px; }
-  p{ color:var(--sub); line-height:1.6; }
-  .band{ width:140px; height:6px; background:var(--band); margin:8px 0 18px 0; border-radius:3px; }
-  ul{ padding-left:20px; margin:0; }
-  ul.full{ width:100%; }
-  ul.half{ width:46%; display:inline-block; vertical-align:top; }
-  img{ display:block; border-radius:10px; margin:16px 0; }
-  img.full{ width:100%; }
-  img.half{ width:46%; display:inline-block; vertical-align:top; margin-left:4%; }
-  .cols{ display:flex; gap:24px; }
-  .cols > div{ flex:1; }
-  @media print {.slide{ box-shadow:none; page-break-after:always; margin:0; border-radius:0; }}
-</style>
-</head>
-<body>
-  <div class="slide title">
-    <h1>${safeTitle(title)}</h1>
-    <div>Generated by Agent Diaz AI</div>
-  </div>
-  ${htmlSlidesStr}
-  ${derivedHtml}
-  ${synthHtml}
-  ${refsHtml}
-</body>
-</html>`;
-
-    const filename = makeFilename(title, "html");
-    const buffer = Buffer.from(html, "utf8");
-    const filePath = await fileStorage.saveFile(filename, buffer);
-    const { size } = await fileStorage.getFileStats(filename);
-
-    await logger.stepEnd(taskId, "Building HTML presentation");
+    
+    // Distribute slides across pages: Home, About, Projects, Contact
+    const sections = this.distributeSlidesToPages(slides);
+    
+    // Generate shared CSS
+    const stylesCSS = this.generateSharedCSS(theme);
+    
+    // Generate shared JS (navigation highlighting + admin button logic)
+    const appJS = this.generateSharedJS();
+    
+    // Generate individual HTML pages
+    const indexHTML = this.generatePageHTML('Home', 'index.html', sections.home, theme, title);
+    const aboutHTML = this.generatePageHTML('About', 'about.html', sections.about, theme, title);
+    const projectsHTML = this.generatePageHTML('Projects', 'projects.html', sections.projects, theme, title);
+    const contactHTML = this.generatePageHTML('Contact', 'contact.html', sections.contact, theme, title);
+    
+    // Generate admin panel files
+    const adminHTML = this.generateAdminHTML();
+    const adminJS = this.generateAdminJS();
+    
+    // Generate Apps Script backend
+    const contentApiGS = this.generateAppsScriptBackend();
+    
+    // Create zip bundle
+    const zipFilename = makeFilename(title, "zip");
+    const zipBuffer = await this.createWebsiteZip({
+      'index.html': indexHTML,
+      'about.html': aboutHTML,
+      'projects.html': projectsHTML,
+      'contact.html': contactHTML,
+      'styles.css': stylesCSS,
+      'app.js': appJS,
+      'admin/index.html': adminHTML,
+      'admin/admin.js': adminJS,
+      'apps_script/ContentApi.gs': contentApiGS,
+    });
+    
+    const filePath = await fileStorage.saveFile(zipFilename, zipBuffer);
+    const { size } = await fileStorage.getFileStats(zipFilename);
+    
+    await logger.stepEnd(taskId, "Built multi-page website bundle");
     return {
-      filename,
+      filename: zipFilename,
       fileSize: size,
       filePath,
       metadata: {
-        slides: 1 + expandedSlides.length + (sources.length ? 1 : 0) + addedDerivedCharts + (addedSynthCharts ? 1 : 0),
-        images: imgCount,
-        charts: chartCount,
+        slides: 4,
+        images: 0,
+        charts: 0,
         theme: theme.name
       },
     };
+  }
+  
+  private distributeSlidesToPages(slides: SlideIn[]): {
+    home: SlideIn[];
+    about: SlideIn[];
+    projects: SlideIn[];
+    contact: SlideIn[];
+  } {
+    // Distribute slides evenly across sections
+    const total = slides.length;
+    const perPage = Math.ceil(total / 4);
+    
+    return {
+      home: slides.slice(0, perPage),
+      about: slides.slice(perPage, perPage * 2),
+      projects: slides.slice(perPage * 2, perPage * 3),
+      contact: slides.slice(perPage * 3),
+    };
+  }
+  
+  private generateSharedCSS(theme: Theme): string {
+    return `:root {
+  --bg: #${theme.bg};
+  --paper: #${theme.paper};
+  --text: #${theme.text};
+  --sub: #${theme.subtext};
+  --accent: #${theme.accent};
+  --band: #${theme.band};
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+header {
+  background: var(--paper);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+nav {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 2rem;
+}
+
+nav a {
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+nav a:hover {
+  color: var(--accent);
+}
+
+nav a.active {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 4px;
+}
+
+.admin-btn {
+  background: var(--accent);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-decoration: none;
+  display: none;
+}
+
+.admin-btn.visible {
+  display: inline-block;
+}
+
+main {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+
+.hero {
+  text-align: center;
+  padding: 4rem 0;
+  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  color: white;
+  border-radius: 16px;
+  margin-bottom: 3rem;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+.section {
+  background: var(--paper);
+  padding: 2.5rem;
+  margin-bottom: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.section h2 {
+  color: var(--text);
+  margin-bottom: 1rem;
+  font-size: 1.8rem;
+}
+
+.section .band {
+  width: 80px;
+  height: 4px;
+  background: var(--band);
+  margin-bottom: 1.5rem;
+  border-radius: 2px;
+}
+
+.section p {
+  color: var(--sub);
+  margin-bottom: 1rem;
+}
+
+.section ul {
+  list-style: disc;
+  margin-left: 1.5rem;
+  color: var(--sub);
+}
+
+.section ul li {
+  margin-bottom: 0.5rem;
+}
+
+.section img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+footer {
+  text-align: center;
+  padding: 2rem;
+  color: var(--sub);
+  margin-top: 4rem;
+}
+
+@media (max-width: 768px) {
+  nav ul {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .hero h1 {
+    font-size: 2rem;
+  }
+  
+  main {
+    padding: 0 1rem;
+  }
+}`;
+  }
+  
+  private generateSharedJS(): string {
+    return `// Active nav highlighting
+document.addEventListener('DOMContentLoaded', () => {
+  const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+  const links = document.querySelectorAll('nav a[href]');
+  
+  links.forEach(link => {
+    const href = link.getAttribute('href');
+    if (href === currentPage || (currentPage === '' && href === 'index.html')) {
+      link.classList.add('active');
+    }
+  });
+  
+  // Show admin button if ?admin=1 or localStorage.adminToken exists
+  const params = new URLSearchParams(window.location.search);
+  const hasAdminParam = params.get('admin') === '1';
+  const hasToken = !!localStorage.getItem('adminToken');
+  
+  if (hasAdminParam || hasToken) {
+    const adminBtn = document.querySelector('.admin-btn');
+    if (adminBtn) {
+      adminBtn.classList.add('visible');
+    }
+  }
+});`;
+  }
+  
+  private generatePageHTML(
+    pageName: string,
+    currentFile: string,
+    slides: SlideIn[],
+    theme: Theme,
+    siteTitle: string
+  ): string {
+    const sectionsHTML = slides.map(slide => {
+      const c = slide.content || {};
+      const heading = sanitizeContent(slide.title || pageName);
+      const body = sanitizeContent(c.subtitle || c.body || '');
+      const bullets = Array.isArray(c.bullets) ? c.bullets.map(b => sanitizeContent(b)) : [];
+      const imageUrl = c.image?.url || '';
+      
+      return `
+    <div class="section">
+      <h2>${heading}</h2>
+      <div class="band"></div>
+      ${body ? `<p>${body}</p>` : ''}
+      ${bullets.length > 0 ? `<ul>${bullets.map(b => `<li>${b}</li>`).join('')}</ul>` : ''}
+      ${imageUrl ? `<img src="${imageUrl}" alt="${heading}" loading="lazy">` : ''}
+    </div>`;
+    }).join('');
+    
+    const isHome = pageName === 'Home';
+    
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${pageName} - ${sanitizeContent(siteTitle)}</title>
+  <meta name="description" content="${sanitizeContent(siteTitle)} - ${pageName} page">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <ul>
+        <li><a href="index.html" data-testid="nav-home">Home</a></li>
+        <li><a href="about.html" data-testid="nav-about">About</a></li>
+        <li><a href="projects.html" data-testid="nav-projects">Projects</a></li>
+        <li><a href="contact.html" data-testid="nav-contact">Contact</a></li>
+      </ul>
+      <a href="admin/index.html" class="admin-btn" data-testid="btn-admin">Admin</a>
+    </nav>
+  </header>
+  
+  <main>
+    ${isHome ? `
+    <div class="hero">
+      <h1>${sanitizeContent(siteTitle)}</h1>
+      <p>${sanitizeContent(slides[0]?.content?.subtitle || slides[0]?.content?.body || 'Welcome to our website')}</p>
+    </div>` : ''}
+    
+    ${sectionsHTML}
+  </main>
+  
+  <footer>
+    <p>&copy; 2025 ${sanitizeContent(siteTitle)}. Generated by Agent Diaz AI.</p>
+  </footer>
+  
+  <script src="app.js"></script>
+</body>
+</html>`;
+  }
+  
+  private generateAdminHTML(): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; }
+    
+    .auth-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    
+    .auth-box {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+    
+    .auth-box h1 {
+      margin-bottom: 1.5rem;
+      color: #333;
+    }
+    
+    .auth-box input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+    
+    .auth-box button {
+      width: 100%;
+      padding: 0.75rem;
+      background: #7c3aed;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    
+    .auth-box button:hover {
+      background: #6d28d9;
+    }
+    
+    .admin-screen {
+      display: none;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    .admin-screen.visible {
+      display: block;
+    }
+    
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    
+    header h1 {
+      color: #333;
+    }
+    
+    .btn-logout {
+      padding: 0.5rem 1rem;
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    
+    .section-selector {
+      margin-bottom: 2rem;
+    }
+    
+    .section-selector label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    
+    .section-selector select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+    
+    .btn-add {
+      margin-bottom: 2rem;
+      padding: 0.75rem 1.5rem;
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    
+    .articles-list {
+      display: grid;
+      gap: 1rem;
+    }
+    
+    .article-card {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .article-card h3 {
+      margin-bottom: 0.5rem;
+      color: #333;
+    }
+    
+    .article-card p {
+      color: #666;
+      margin-bottom: 1rem;
+    }
+    
+    .article-card .actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .article-card button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    
+    .btn-edit {
+      background: #3b82f6;
+      color: white;
+    }
+    
+    .btn-delete {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .modal.visible {
+      display: flex;
+    }
+    
+    .modal-content {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 600px;
+    }
+    
+    .modal-content h2 {
+      margin-bottom: 1.5rem;
+    }
+    
+    .modal-content label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    
+    .modal-content input,
+    .modal-content textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+      font-family: inherit;
+    }
+    
+    .modal-content textarea {
+      min-height: 150px;
+      resize: vertical;
+    }
+    
+    .modal-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+    
+    .modal-actions button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    
+    .btn-cancel {
+      background: #6b7280;
+      color: white;
+    }
+    
+    .btn-save {
+      background: #10b981;
+      color: white;
+    }
+    
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #1f2937;
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      display: none;
+      z-index: 2000;
+    }
+    
+    .toast.visible {
+      display: block;
+      animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    
+    .error {
+      color: #ef4444;
+      font-size: 0.9rem;
+      margin-top: -0.5rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-screen" id="authScreen">
+    <div class="auth-box">
+      <h1>Admin Login</h1>
+      <input type="password" id="tokenInput" placeholder="Enter admin token" data-testid="input-token">
+      <button id="loginBtn" data-testid="btn-login">Login</button>
+      <p id="authError" class="error"></p>
+    </div>
+  </div>
+  
+  <div class="admin-screen" id="adminScreen">
+    <header>
+      <h1>Content Management</h1>
+      <button class="btn-logout" id="logoutBtn" data-testid="btn-logout">Logout</button>
+    </header>
+    
+    <div class="section-selector">
+      <label for="sectionSelect">Section:</label>
+      <select id="sectionSelect" data-testid="select-section">
+        <option value="home">Home</option>
+        <option value="about">About</option>
+        <option value="projects">Projects</option>
+        <option value="contact">Contact</option>
+      </select>
+    </div>
+    
+    <button class="btn-add" id="addBtn" data-testid="btn-add-article">Add Article</button>
+    
+    <div class="articles-list" id="articlesList"></div>
+  </div>
+  
+  <div class="modal" id="articleModal">
+    <div class="modal-content">
+      <h2 id="modalTitle">Add Article</h2>
+      <form id="articleForm">
+        <label for="articleTitle">Title *</label>
+        <input type="text" id="articleTitle" required data-testid="input-article-title">
+        <p id="titleError" class="error"></p>
+        
+        <label for="articleBody">Body * (min 50 characters)</label>
+        <textarea id="articleBody" required data-testid="input-article-body"></textarea>
+        <p id="bodyError" class="error"></p>
+        
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" id="cancelBtn" data-testid="btn-cancel">Cancel</button>
+          <button type="submit" class="btn-save" data-testid="btn-save">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <div class="toast" id="toast"></div>
+  
+  <script src="admin.js"></script>
+</body>
+</html>`;
+  }
+  
+  private generateAdminJS(): string {
+    return `// Admin Panel Logic
+const API_BASE = 'YOUR_APPS_SCRIPT_URL'; // Replace with deployed Apps Script URL
+let currentSection = 'home';
+let editingArticleId = null;
+
+// Auth
+document.getElementById('loginBtn').addEventListener('click', login);
+document.getElementById('logoutBtn').addEventListener('click', logout);
+
+function login() {
+  const token = document.getElementById('tokenInput').value.trim();
+  const errorEl = document.getElementById('authError');
+  
+  if (!token) {
+    errorEl.textContent = 'Please enter a token';
+    return;
+  }
+  
+  localStorage.setItem('adminToken', token);
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('adminScreen').classList.add('visible');
+  loadArticles();
+}
+
+function logout() {
+  localStorage.removeItem('adminToken');
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('adminScreen').classList.remove('visible');
+}
+
+// Check auth on load
+if (localStorage.getItem('adminToken')) {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('adminScreen').classList.add('visible');
+  loadArticles();
+}
+
+// Section selector
+document.getElementById('sectionSelect').addEventListener('change', (e) => {
+  currentSection = e.target.value;
+  loadArticles();
+});
+
+// Modal
+const modal = document.getElementById('articleModal');
+const articleForm = document.getElementById('articleForm');
+
+document.getElementById('addBtn').addEventListener('click', () => {
+  editingArticleId = null;
+  document.getElementById('modalTitle').textContent = 'Add Article';
+  document.getElementById('articleTitle').value = '';
+  document.getElementById('articleBody').value = '';
+  clearErrors();
+  modal.classList.add('visible');
+});
+
+document.getElementById('cancelBtn').addEventListener('click', () => {
+  modal.classList.remove('visible');
+});
+
+articleForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearErrors();
+  
+  const title = document.getElementById('articleTitle').value.trim();
+  const body = document.getElementById('articleBody').value.trim();
+  
+  // Validation
+  let hasError = false;
+  
+  if (!title) {
+    document.getElementById('titleError').textContent = 'Title is required';
+    hasError = true;
+  }
+  
+  if (!body || body.length < 50) {
+    document.getElementById('bodyError').textContent = 'Body must be at least 50 characters';
+    hasError = true;
+  }
+  
+  if (hasError) return;
+  
+  // Sanitize XSS
+  const sanitizedTitle = sanitizeHTML(title);
+  const sanitizedBody = sanitizeHTML(body);
+  
+  const article = {
+    id: editingArticleId || \`article-\${Date.now()}\`,
+    title: sanitizedTitle,
+    body: sanitizedBody,
+    updatedAt: Date.now()
+  };
+  
+  try {
+    if (editingArticleId) {
+      await updateArticle(article);
+      showToast('Article updated successfully');
+    } else {
+      await createArticle(article);
+      showToast('Article created successfully');
+    }
+    
+    modal.classList.remove('visible');
+    loadArticles();
+  } catch (err) {
+    showToast('Error: ' + err.message, true);
+  }
+});
+
+// CRUD operations
+async function loadArticles() {
+  try {
+    const response = await fetch(\`\${API_BASE}?action=get&section=\${currentSection}\`, {
+      headers: { 'Authorization': \`Bearer \${localStorage.getItem('adminToken')}\` }
+    });
+    
+    if (!response.ok) throw new Error('Failed to load articles');
+    
+    const data = await response.json();
+    const articles = data.sections[currentSection] || [];
+    
+    renderArticles(articles);
+  } catch (err) {
+    showToast('Error loading articles: ' + err.message, true);
+  }
+}
+
+async function createArticle(article) {
+  const response = await fetch(API_BASE, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': \`Bearer \${localStorage.getItem('adminToken')}\`
+    },
+    body: JSON.stringify({
+      action: 'create',
+      section: currentSection,
+      article
+    })
+  });
+  
+  if (!response.ok) throw new Error('Failed to create article');
+  return response.json();
+}
+
+async function updateArticle(article) {
+  const response = await fetch(API_BASE, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': \`Bearer \${localStorage.getItem('adminToken')}\`
+    },
+    body: JSON.stringify({
+      action: 'update',
+      section: currentSection,
+      article
+    })
+  });
+  
+  if (!response.ok) throw new Error('Failed to update article');
+  return response.json();
+}
+
+async function deleteArticle(id) {
+  if (!confirm('Are you sure you want to delete this article?')) return;
+  
+  try {
+    const response = await fetch(API_BASE, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': \`Bearer \${localStorage.getItem('adminToken')}\`
+      },
+      body: JSON.stringify({
+        action: 'delete',
+        section: currentSection,
+        id
+      })
+    });
+    
+    if (!response.ok) throw new Error('Failed to delete article');
+    
+    showToast('Article deleted successfully');
+    loadArticles();
+  } catch (err) {
+    showToast('Error: ' + err.message, true);
+  }
+}
+
+function renderArticles(articles) {
+  const container = document.getElementById('articlesList');
+  
+  if (articles.length === 0) {
+    container.innerHTML = '<p style="color: #666;">No articles yet. Click "Add Article" to create one.</p>';
+    return;
+  }
+  
+  container.innerHTML = articles.map(article => \`
+    <div class="article-card" data-testid="article-\${article.id}">
+      <h3>\${escapeHTML(article.title)}</h3>
+      <p>\${escapeHTML(article.body.substring(0, 150))}...</p>
+      <div class="actions">
+        <button class="btn-edit" onclick="editArticle('\${article.id}')" data-testid="btn-edit-\${article.id}">Edit</button>
+        <button class="btn-delete" onclick="deleteArticle('\${article.id}')" data-testid="btn-delete-\${article.id}">Delete</button>
+      </div>
+    </div>
+  \`).join('');
+}
+
+function editArticle(id) {
+  // Load article data
+  fetch(\`\${API_BASE}?action=get&section=\${currentSection}\`)
+    .then(r => r.json())
+    .then(data => {
+      const article = (data.sections[currentSection] || []).find(a => a.id === id);
+      if (!article) return;
+      
+      editingArticleId = id;
+      document.getElementById('modalTitle').textContent = 'Edit Article';
+      document.getElementById('articleTitle').value = article.title;
+      document.getElementById('articleBody').value = article.body;
+      clearErrors();
+      modal.classList.add('visible');
+    });
+}
+
+// Utilities
+function sanitizeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function clearErrors() {
+  document.getElementById('titleError').textContent = '';
+  document.getElementById('bodyError').textContent = '';
+}
+
+function showToast(message, isError = false) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.style.background = isError ? '#ef4444' : '#1f2937';
+  toast.classList.add('visible');
+  
+  setTimeout(() => {
+    toast.classList.remove('visible');
+  }, 3000);
+}`;
+  }
+  
+  private generateAppsScriptBackend(): string {
+    return `// Google Apps Script Backend (ContentApi.gs)
+// Deploy as: Web App with "Anyone" access
+
+const ADMIN_TOKEN = 'YOUR_SECRET_TOKEN'; // Change this in Script Properties
+const CONTENT_KEY = 'website_content';
+
+function doGet(e) {
+  const action = e.parameter.action;
+  
+  // CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Content-Type': 'application/json'
+  };
+  
+  if (action === 'get') {
+    const section = e.parameter.section;
+    const content = getContent();
+    
+    if (section) {
+      return ContentService.createTextOutput(JSON.stringify({
+        sections: { [section]: content.sections[section] || [] }
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify(content))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify({ error: 'Invalid action' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const token = extractToken(e);
+    
+    // Verify token
+    const adminToken = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN') || ADMIN_TOKEN;
+    if (token !== adminToken) {
+      return createResponse({ error: 'Unauthorized' }, 401);
+    }
+    
+    const { action, section, article, id } = data;
+    const content = getContent();
+    
+    if (!content.sections[section]) {
+      content.sections[section] = [];
+    }
+    
+    switch (action) {
+      case 'create':
+        content.sections[section].push(article);
+        break;
+        
+      case 'update':
+        const updateIndex = content.sections[section].findIndex(a => a.id === article.id);
+        if (updateIndex !== -1) {
+          content.sections[section][updateIndex] = article;
+        }
+        break;
+        
+      case 'delete':
+        content.sections[section] = content.sections[section].filter(a => a.id !== id);
+        break;
+        
+      default:
+        return createResponse({ error: 'Invalid action' }, 400);
+    }
+    
+    saveContent(content);
+    return createResponse({ success: true, content });
+    
+  } catch (err) {
+    return createResponse({ error: err.message }, 500);
+  }
+}
+
+function getContent() {
+  const stored = PropertiesService.getScriptProperties().getProperty(CONTENT_KEY);
+  
+  if (!stored) {
+    return {
+      sections: {
+        home: [],
+        about: [],
+        projects: [],
+        contact: []
+      }
+    };
+  }
+  
+  return JSON.parse(stored);
+}
+
+function saveContent(content) {
+  PropertiesService.getScriptProperties().setProperty(CONTENT_KEY, JSON.stringify(content));
+}
+
+function extractToken(e) {
+  const authHeader = e.parameter.authorization || e.parameters.authorization;
+  if (authHeader && authHeader[0]) {
+    return authHeader[0].replace('Bearer ', '');
+  }
+  return null;
+}
+
+function createResponse(data, status = 200) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// CORS Preflight
+function doOptions(e) {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    });
+}`;
+  }
+  
+  private async createWebsiteZip(files: Record<string, string>): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const bufferStream = new Writable({
+        write(chunk, encoding, callback) {
+          chunks.push(Buffer.from(chunk));
+          callback();
+        },
+      });
+      
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      
+      archive.on('error', reject);
+      archive.on('end', () => resolve(Buffer.concat(chunks)));
+      
+      archive.pipe(bufferStream);
+      
+      // Add all files to zip
+      for (const [filepath, content] of Object.entries(files)) {
+        archive.append(content, { name: filepath });
+      }
+      
+      archive.finalize();
+    });
   }
 
   /* ──────────────────────────── DOCX ──────────────────────────── */

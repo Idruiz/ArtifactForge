@@ -1,0 +1,88 @@
+Proceed with both: build the multi-page website and the Admin panel now. These aren’t “nice-to-haves”—they’re core scope. And yes, keep the blockers you say are “fixed” stable while you do it.
+
+Implementation orders & non-negotiables
+
+Multi-page site (deliverable)
+
+Pages: /index.html, /about.html, /projects.html, /contact.html
+
+Shared assets: /styles.css, /app.js
+
+Nav: header links must route to the correct separate pages (no in-page anchors). Persistent active-link highlight.
+
+Copy is concise/professional (≤3-word headers).
+
+Bundle returned as a Website artifact.
+
+Admin sub-artifact (fully working)
+
+Paths:
+
+/admin/index.html, /admin/admin.js
+
+/apps_script/ContentApi.gs (backend for Sheets Web App)
+
+GS backend:
+
+doGet(e):
+
+GET /content → JSON { sections: { home:[], about:[], projects:[], contact:[] } }
+
+optional GET /admin → serves admin HTML
+
+doPost(e):
+
+action: create|update|delete, section, id, title, body, token
+
+Script Properties for token; no secrets in client.
+
+Admin UI:
+
+Discreet button in site chrome (visible if ?admin=1 or localStorage.adminToken).
+
+CRUD per section, validation (title required, body ≥ 50 chars), toasts, optimistic UI w/ rollback on failure.
+
+Content model (use this):
+
+{
+  "sections": {
+    "home":    [{"id":"...", "title":"...", "body":"...", "updatedAt": 0}],
+    "about":   [{"id":"...", "title":"...", "body":"...", "updatedAt": 0}],
+    "projects":[{"id":"...", "title":"...", "body":"...", "updatedAt": 0}],
+    "contact": [{"id":"...", "title":"...", "body":"...", "updatedAt": 0}]
+  }
+}
+
+
+Return the Admin bundle as a sub-artifact of the website artifact.
+
+Do not regress the fixes you shipped:
+
+Car Mode: state machine + 3-sec VAD → finalize → transcribe → send → respond → idle. No “stuck listening,” no “repeat last message.”
+
+DOCX: readable text, embedded charts (no raw URLs).
+
+Sanitization: no prompt/system text leakage anywhere.
+
+Tests you must include (part of this work, not optional)
+
+Website E2E: clicking each header lands on the correct page; 404s handled; active nav state correct.
+
+Admin E2E: create → edit → delete → persist via GS; token check enforced; XSS sanitized.
+
+Contract tests for GET /content and POST /content (schema above).
+
+Regression: Car Mode flows; DOCX contains image parts; HTML leak check (/system|prompt|instruction/i).
+
+Deliverables
+
+Website bundle + Admin sub-artifact + ContentApi.gs (ready to deploy via doGet/doPost).
+
+Test notes and a quick “How to Deploy on Apps Script” snippet.
+
+Short rollback notes (feature flags, files touched).
+
+Go ahead and implement. If something’s truly blocking, say exactly which file/contract is ambiguous and ship a minimal, reversible stub behind a flag—otherwise, full build.
+
+Thinking
+ChatGPT can make mistakes.
