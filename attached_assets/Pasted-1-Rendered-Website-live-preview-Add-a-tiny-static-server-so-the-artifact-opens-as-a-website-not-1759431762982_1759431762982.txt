@@ -1,0 +1,87 @@
+1) Rendered Website (live preview)
+
+Add a tiny static server so the artifact opens as a website, not code.
+
+Entry file: server.js
+
+Start command: node server.js
+
+Static folder: /site (contains index.html, about.html, projects.html, contact.html, styles.css, app.js).
+
+All nav links must be file links: /about.html, /projects.html, /contact.html (not anchors, not hash routes).
+
+// server.js — minimal static host for preview
+const express = require("express");
+const path = require("path");
+const app = express();
+const SITE_DIR = path.join(__dirname, "site");
+
+app.use(express.static(SITE_DIR, {
+  extensions: ["html"], // allows /about to resolve to about.html
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".html")) res.setHeader("Content-Type", "text/html; charset=utf-8");
+  }
+}));
+
+app.get("/", (_req, res) => res.sendFile(path.join(SITE_DIR, "index.html")));
+app.listen(process.env.PORT || 3000, () => console.log("Website running on / (index.html)"));
+
+
+Acceptance: The Website artifact must include a “Live Preview” link (the running server) and clicking nav headers changes pages properly.
+
+2) Source Bundle (downloadable code)
+
+Provide a zip sub-artifact named website_source.zip with this exact layout:
+
+/site/
+  index.html
+  about.html
+  projects.html
+  contact.html
+  styles.css
+  app.js
+/server.js
+
+
+Keep your Admin bundle as a separate sub-artifact (fully working):
+
+/admin/index.html
+/admin/admin.js
+/apps_script/ContentApi.gs   // doGet/doPost ready for Apps Script Web App
+
+Apps Script multi-page serving (so it also renders from Sheets)
+
+Add this router so the code artifact runs as a Sheets Web App, not raw text:
+
+// ContentApi.gs — add this to the Admin sub-artifact
+function doGet(e) {
+  var page = (e && e.parameter && e.parameter.page) ? String(e.parameter.page) : 'index';
+  var allowed = {index:true, about:true, projects:true, contact:true, admin:true};
+  if (!allowed[page]) page = 'index';
+  return HtmlService.createHtmlOutputFromFile(page)
+    .setTitle('Site')
+    .addMetaTag('viewport','width=device-width,initial-scale=1');
+}
+
+
+Required files in Apps Script project: index.html, about.html, projects.html, contact.html, plus admin.html (or serve admin via /admin/index.html in the source bundle and expose endpoints with doPost).
+
+Hard requirements for the agent (paste to them verbatim)
+
+Deliver TWO artifacts:
+
+Rendered Website (live server)
+
+Source Bundle ZIP (exact tree above)
+
+Ensure links are /about.html, /projects.html, /contact.html (no hashes, no SPA router).
+
+Ensure correct Content-Type: text/html so files render, not download as text.
+
+Provide run instructions in the artifact: npm i express && node server.js.
+
+Also include Apps Script route (doGet) so the same pages render when deployed as a Web App.
+
+Do not regress Car Mode/DOCX/sanitization fixes.
+
+Short version for the agent: “Stop handing me only code viewers. Ship a running static site + a zip of the source, and include an Apps Script doGet so it renders from Sheets too.”
