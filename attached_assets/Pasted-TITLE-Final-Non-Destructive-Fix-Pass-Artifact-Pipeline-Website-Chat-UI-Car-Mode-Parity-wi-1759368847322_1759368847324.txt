@@ -1,0 +1,111 @@
+TITLE: Final, Non-Destructive Fix Pass — Artifact Pipeline + Website + Chat UI + Car Mode (Parity with Apps Script). MUST NOT BREAK ANYTHING.
+
+ROLE
+You are a senior full-stack engineer. Deliver a definitive, production-grade fix across:
+1) DOCX Insight Report artifact (charts/images embedded, no gibberish),
+2) Website artifact (no prompt leaks, correct anchors, professional headers, Admin CRUD + Apps Script backend),
+3) Chat UI (scroll up & down, virtualization, “Jump to Latest”),
+4) Car Mode (state machine fixed, parity with provided Apps Script reference).
+No rewrites. Surgical changes only, behind feature flags. I’ve burned my monthly budget due to insufficient/erroneous fixes—this pass must be clean and final.
+
+REPO CONTEXT (do not change layout unless absolutely required)
+- Artifact pipeline generates DOCX, Website, etc.
+- Frontend chat UI (web app) with Car Mode (voice I/O).
+- Keep existing storage and env handling. If adding files, co-locate and import cleanly.
+
+KNOWN BUGS / REQUIRED FIXES
+A) DOCX Insight Report
+- Current: illegible text, charts missing; raw chart URLs leak (e.g., QuickChart string soup).
+- Required:
+  1. Use existing analysis; if you must change, gate behind `ANALYSIS_V2=on`.
+  2. Render charts server-side to PNGs (current QuickChart/Chart.js path OK). Embed images into DOCX (no raw URLs). Add alt text.
+  3. Styles: 11–12pt body, H1/H2/H3, sane margins; lists for findings.
+  4. Sections: Title Page → Executive Summary (5–10 bullets) → Key Metrics (tables + charts) → Trends & Comparisons → Recommendations.
+  5. Tests: assert embedded image parts exist; forbid `https://quickchart.io/` in body text; DOCX opens in Word/Google Docs without corruption.
+
+B) Website Artifact
+- Current: LLM prompt text leaks into page header; anchors land in “between” space; headers wordy/unprofessional.
+- Required:
+  1. Strip ALL system/prompt/internal strings before render. Unit test fails if `/system|prompt|instruction/i` found in output.
+  2. Correct nav: map each header to unique section `id`; fix sticky-header offsets using `scroll-margin-top` or smooth-scroll helper with precise offset.
+  3. Copy: concise, professional headers (≤3 words): “Home”, “Articles”, “Projects”, “Contact”. Externalize titles into `copy.json`.
+  4. Deliver these files (as artifact bundle + inline code blocks):
+     - `/site/index.html`, `/site/styles.css`, `/site/app.js`
+     - `/site/admin.js` (if separate)
+     - `/apps_script/ContentApi.gs` (Google Apps Script) with:
+       • `doGet(e)` → `GET /content` (JSON articles by quadrant), optional `GET /admin` (serves admin panel)
+       • `doPost(e)` → CRUD (`action`: create/update/delete) with basic token check
+       • Script Properties constants; no secrets in client
+  5. Admin button: visible only if `?admin=1` or `localStorage.adminToken` exists. Admin panel supports list/create/edit/delete per quadrant; validate title + min body length; toast on success/error; network calls wrapped in try/catch with user feedback.
+  6. Tests:
+     - Anchor integrity: each `a[href^="#"]` resolves to an in-doc `id`.
+     - E2E click test: all nav items land within 16px of section top.
+     - Leak test: no prompt/system text in HTML.
+     - CRUD: create/edit/delete persists and reflects in UI.
+
+C) Chat Window (bi-directional scroll)
+- Current: scrolls down only; cannot view history.
+- Required:
+  1. Virtualized message list; prepend older pages on up-scroll with stable scroll position (no jump).
+  2. Auto-stick to bottom only when user is near bottom; otherwise don’t yank view.
+  3. “Jump to Latest” button appears when >1 viewport from bottom.
+  4. Tests: 500+ messages smooth; prepend page keeps viewport stable; auto-stick logic correct.
+
+D) Car Mode — **Broken Toggle + No VAD/Auto-Send** (Parity with Apps Script reference below)
+- Current: Toggle stuck in “listening”; no 3-sec silence detection; never transitions to transcribe/send/respond; repeats last message. This is a deeper state issue.
+- Required (mirror the Apps Script design and fix thoroughly):
+  1. Implement explicit state machine:
+     STATES = IDLE → REQUEST_PERMISSION → LISTENING → PARTIAL_RESULTS → FINAL_RESULT → SENDING → RESPONDING → IDLE
+     • Exactly one active state. On enter, cancel timers/streams from prior state.
+  2. Voice Activity Detection (VAD) + silence timeout:
+     • If 3 seconds of silence, finalize recording → close stream → transition to FINAL_RESULT (or “no speech” path).
+     • Configurable `SILENCE_MS=3000` with min floor and max cap. Debounce end-of-speech.
+  3. Transcription:
+     • On FINAL_RESULT, run whisper (or current STT) once; ensure one—and only one—send per utterance.
+     • Handle empty/very short results with a friendly prompt to retry.
+  4. Send/Respond:
+     • SENDING posts exactly once; RESPONDING waits for server; display progress. No “loop last reply” bug.
+  5. Toggle logic:
+     • “Car Mode” switch sets mode but does not force LISTENING if permission denied or already active.
+     • Push-to-Talk and Toggle Listen supported. Visible indicators for live/partial/final.
+  6. Error Handling:
+     • Mic blocked/denied → actionable UI tip; offer re-request.
+     • Network failures/timeouts → exponential backoff (cap retries), clear banner messages.
+     • Race conditions: if user toggles off mid-stream, abort safely and return to IDLE without dangling listeners.
+  7. Tests:
+     • Simulate permission denied → correct banner; no stuck “listening.”
+     • Simulate silence → 3s timeout → finalize → transcribe → send → respond → back to IDLE.
+     • Rapid toggles do not produce concurrent streams or repeated messages.
+     • Regression: no “repeat last assistant message” loop.
+  8. **Parity with Apps Script reference**:
+     • Study the GS snippet (Appendix A). Port the same *intent*: strict state control, latest-message selection, single active run/stream, structured errors.
+     • Keep your current language/runtime, but replicate the state machine contract and the “pick latest message” rule.
+     • Provide a small `carMode.testPlan.md` with manual steps & expected outcomes.
+
+NON-NEGOTIABLES
+- Preserve all working artifact types and public function signatures; if you must change, keep a shim and deprecation note.
+- No secrets in client; keep env handling unchanged.
+- Sanitize all user input in Admin panel; escape HTML; never eval.
+- Accessibility: ARIA roles and keyboard nav—no regressions.
+
+CROSS-CUTTING
+- Feature flags: risky changes behind flags default ON and revertible via `.env`/UI.
+- Structured logging: `{component, state, action, status, duration_ms, error}`.
+- Lint/format; no TODO stubs left behind.
+- Docs: `FIXES.md` listing changes, flags, how to test/rollback.
+
+DELIVERABLES (ALL REQUIRED)
+1) Patch diffs or file list with exact paths.
+2) Website artifact bundle + inline code blocks (`index.html`, `styles.css`, `app.js`, `admin.js` if used, and `ContentApi.gs`).
+3) Sample DOCX (base64 or link) with ≥3 embedded charts (no raw URLs).
+4) Test notes for each area; `carMode.testPlan.md` with steps for the 3-sec silence and toggle cases.
+5) Rollback instructions (flags to toggle).
+
+DEFINITION OF DONE
+- DOCX: readable text + ≥3 embedded charts; opens cleanly.
+- Website: zero prompt leaks; anchors land precisely; concise headers; Admin CRUD persists via JSON/API; Apps Script compiles and serves GET/POST.
+- Chat UI: bidirectional scroll with virtualization; “Jump to Latest”; no forced auto-scroll while reading.
+- Car Mode: not stuck in “listening”; 3-sec silence finalizes; single send per utterance; no “repeat last message”; robust error handling; parity with GS behavior.
+- No regressions; no broken public APIs; no secrets leaked; tests green.
+
+Proceed in phases: AUDIT → propose minimal plan → implement behind flags → run tests → deliver artifacts + docs.
