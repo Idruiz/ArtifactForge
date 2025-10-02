@@ -17,9 +17,11 @@
 
 import PptxGenJS from "pptxgenjs";
 import axios from "axios";
+import archiver from "archiver";
+import { Writable } from "stream";
 import { fileStorage } from "../utils/fileStorage";
 import { logger } from "../utils/logger";
-import { Document, Packer, Paragraph, HeadingLevel, TextRun } from "docx";
+import { Document, Packer, Paragraph, HeadingLevel, TextRun, ImageRun } from "docx";
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
 
@@ -170,6 +172,39 @@ function escapeXml(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/**
+ * Sanitize content to remove system/prompt/instruction text that may leak from LLM responses
+ * Critical for website artifacts to prevent exposing internal prompts
+ */
+function sanitizeContent(text: string): string {
+  if (!text) return "";
+  
+  let sanitized = String(text);
+  
+  // Remove common LLM prompt patterns (case-insensitive)
+  const leakPatterns = [
+    /system\s*:/gi,
+    /assistant\s*:/gi,
+    /user\s*:/gi,
+    /\bprompt\b/gi,
+    /\binstruction\b/gi,
+    /you\s+are\s+(an?\s+)?(ai|assistant|chatbot)/gi,
+    /as\s+an?\s+(ai|assistant|chatbot)/gi,
+    /i\s+am\s+(an?\s+)?(ai|assistant|language\s+model)/gi,
+    /respond\s+to\s+the\s+following/gi,
+    /based\s+on\s+the\s+following\s+(prompt|instruction)/gi,
+  ];
+  
+  for (const pattern of leakPatterns) {
+    sanitized = sanitized.replace(pattern, "");
+  }
+  
+  // Clean up multiple spaces/newlines left by replacements
+  sanitized = sanitized.replace(/\s{2,}/g, " ").trim();
+  
+  return sanitized;
 }
 
 /* ───────────── QuickChart helpers (Doughnut/Pie only) ───────────── */
@@ -1126,38 +1161,111 @@ class BuilderService {
     slides: SlideIn[],
     sources: string[],
   ): Promise<BuildResult> {
+    let embeddedChartsCount = 0;
+    let embeddedImagesCount = 0;
+    
+    // Process slides and embed charts/images
+    const sections = await Promise.all(
+      slides.map(async (s, i) => {
+        const c: any = s.content || {};
+        const parts: any[] = [
+          new Paragraph({ text: `${i + 1}. ${safeTitle(s.title || "Slide")}`, heading: HeadingLevel.HEADING_2 }),
+        ];
+        
+        // Add body text
+        const text = c.subtitle || c.body || "";
+        if (text) parts.push(new Paragraph({ text }));
+        
+        // Add bullets
+        if (Array.isArray(c.bullets) && c.bullets.length) {
+          parts.push(new Paragraph({ text: "• " + c.bullets.join("\n• ") }));
+        }
+        
+        // Add notes
+        if (c.notes) {
+          parts.push(new Paragraph({ children: [new TextRun({ text: `Notes: ${c.notes}`, italics: true, color: "666666" })] }));
+        }
+        
+        // Embed charts as images (NO raw URLs!)
+        let chartUrl: string | null = null;
+        let spec: any | null = c.chartSpec ? normalizeToDoughnutSpec(c.chartSpec) : null;
+        if (spec && hasUsableChartData(spec)) {
+          chartUrl = chartUrlFromSpec(spec);
+        } else if (c.chart?.url && looksLikeImageUrl(c.chart.url)) {
+          chartUrl = c.chart.url;
+        }
+        
+        if (chartUrl) {
+          try {
+            const response = await axios.get(chartUrl, {
+              responseType: "arraybuffer",
+              timeout: 15000,
+              headers: { "User-Agent": "Agent Diaz/1.0 (docx-embedder)" },
+            });
+            const imageBuffer = Buffer.from(response.data);
+            
+            parts.push(
+              new Paragraph({
+                children: [
+                  new ImageRun({
+                    data: imageBuffer,
+                    transformation: {
+                      width: 450,
+                      height: 300,
+                    },
+                  } as any),
+                ],
+              })
+            );
+            embeddedChartsCount++;
+          } catch (err: any) {
+            await logger.trace(taskId, `Failed to embed chart: ${err.message || err}`);
+            // Fallback: add descriptive text (NO URL)
+            parts.push(new Paragraph({ children: [new TextRun({ text: `[Chart: ${c.chart?.title || "visualization"}]`, italics: true, color: "999999" })] }));
+          }
+        }
+        
+        // Embed images
+        if (c.image?.url) {
+          try {
+            const response = await axios.get(c.image.url, {
+              responseType: "arraybuffer",
+              timeout: 15000,
+              headers: { "User-Agent": "Agent Diaz/1.0 (docx-embedder)" },
+            });
+            const imageBuffer = Buffer.from(response.data);
+            
+            parts.push(
+              new Paragraph({
+                children: [
+                  new ImageRun({
+                    data: imageBuffer,
+                    transformation: {
+                      width: 500,
+                      height: 350,
+                    },
+                  } as any),
+                ],
+              })
+            );
+            embeddedImagesCount++;
+          } catch (err: any) {
+            await logger.trace(taskId, `Failed to embed image: ${err.message || err}`);
+            // Fallback: add descriptive text (NO URL)
+            parts.push(new Paragraph({ children: [new TextRun({ text: `[Image: ${c.image.description || "content image"}]`, italics: true, color: "999999" })] }));
+          }
+        }
+        
+        return parts;
+      })
+    );
+    
     const doc = new Document({
       sections: [{
         properties: {},
         children: [
           new Paragraph({ text: safeTitle(title), heading: HeadingLevel.TITLE }),
-          ...slides.flatMap((s, i) => {
-            const c: any = s.content || {};
-            const parts = [
-              new Paragraph({ text: `${i + 1}. ${safeTitle(s.title || "Slide")}`, heading: HeadingLevel.HEADING_2 }),
-            ];
-            const text = c.subtitle || c.body || "";
-            if (text) parts.push(new Paragraph({ text }));
-            if (Array.isArray(c.bullets) && c.bullets.length) {
-              parts.push(new Paragraph({ text: "• " + c.bullets.join("\n• ") }));
-            }
-            if (c.notes) {
-              parts.push(new Paragraph({ children: [new TextRun({ text: `Notes: ${c.notes}`, italics: true, color: "666666" })] }));
-            }
-            // Only annotate charts that WOULD pass donut gating; keep docx lightweight
-            let spec: any | null = c.chartSpec ? normalizeToDoughnutSpec(c.chartSpec) : null;
-            if (spec && hasUsableChartData(spec)) {
-              const meta = getDonutMeta(spec);
-              const note = meta.n >= 3 ? "[Chart: doughnut ≥3 categories]" : "[Chart: doughnut 2 categories]";
-              parts.push(new Paragraph({ children: [new TextRun({ text: `${note} ${chartUrlFromSpec(spec)}`, italics: true, color: "666666" })] }));
-            } else if (c.chart?.url && looksLikeImageUrl(c.chart.url)) {
-              parts.push(new Paragraph({ children: [new TextRun({ text: `[Chart] ${c.chart.title || ""} ${c.chart.url}`, italics: true, color: "666666" })] }));
-            }
-            if (c.image?.url) {
-              parts.push(new Paragraph({ children: [new TextRun({ text: `[Image] ${c.image.description || ""} ${c.image.url}`, italics: true, color: "666666" })] }));
-            }
-            return parts;
-          }),
+          ...sections.flat(),
           ...(sources.length ? [
             new Paragraph({ text: "References", heading: HeadingLevel.HEADING_2 }),
             new Paragraph({ text: sources.join("\n") })
@@ -1178,8 +1286,8 @@ class BuilderService {
       filePath,
       metadata: {
         slides: slides.length,
-        images: slides.filter(s => s.content?.image?.url).length,
-        charts: slides.filter(s => (s.content as any)?.chart?.url || (s.content as any)?.chartSpec).length,
+        images: embeddedImagesCount,
+        charts: embeddedChartsCount,
         theme: "n/a",
       },
     };
@@ -1503,14 +1611,15 @@ class BuilderService {
   ): Promise<BuildResult> {
     const theme = deriveTheme(title);
     
-    const heroText = slides?.[0]?.content?.subtitle || slides?.[0]?.content?.body || "Welcome to our website";
+    // Sanitize all content to prevent system/prompt leaks
+    const heroText = sanitizeContent(slides?.[0]?.content?.subtitle || slides?.[0]?.content?.body || "Welcome to our website");
     const heroImage = slides?.[0]?.content?.image?.url || "";
     
     const sections = (slides || []).slice(1).map((s: any, i: number) => ({
       id: `section-${i + 1}`,
-      heading: s?.title ? String(s.title) : `Section ${i + 1}`,
-      body: s?.content?.subtitle ? String(s.content.subtitle) : (s?.content?.body ? String(s.content.body) : ""),
-      bullets: Array.isArray(s?.content?.bullets) ? s.content.bullets : [],
+      heading: sanitizeContent(s?.title ? String(s.title) : `Section ${i + 1}`),
+      body: sanitizeContent(s?.content?.subtitle ? String(s.content.subtitle) : (s?.content?.body ? String(s.content.body) : "")),
+      bullets: Array.isArray(s?.content?.bullets) ? s.content.bullets.map((b: string) => sanitizeContent(b)) : [],
       image: s?.content?.image?.url || "",
       chart: s?.content?.chart?.url || "",
     })).slice(0, 10);

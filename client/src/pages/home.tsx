@@ -108,16 +108,23 @@ export default function Home() {
 
   // ---------- speak assistant replies (both normal and Car Mode) ----------
   const lastSpokenIdRef = useRef<string>("");
+  const speakingInProgressRef = useRef<boolean>(false);
   
   useEffect(() => {
-    if ((voiceEnabled || isCarMode) && wsMessages.length > 0) {
+    if ((voiceEnabled || isCarMode) && wsMessages.length > 0 && !speakingInProgressRef.current) {
       const last = wsMessages[wsMessages.length - 1];
       if (last.role === "assistant" && last.status === "completed" && last.id !== lastSpokenIdRef.current) {
+        console.log(`[TTS Trigger] Speaking message ID: ${last.id}`);
         lastSpokenIdRef.current = last.id;
+        speakingInProgressRef.current = true;
         speak(last.content);
+        // Reset flag after a delay to allow next message
+        setTimeout(() => {
+          speakingInProgressRef.current = false;
+        }, 1000);
       }
     }
-  }, [wsMessages, voiceEnabled, isCarMode]);
+  }, [wsMessages, voiceEnabled, isCarMode, speak]);
 
   // ---------- handlers ----------
   const handleSendMessage = () => {
