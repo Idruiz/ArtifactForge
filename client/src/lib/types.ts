@@ -10,6 +10,9 @@ export interface ArtifactRef {
   fileType: string;
   fileSize: number;
   downloadUrl: string;
+  liveUrl?: string;
+  previewUrl?: string;
+  siteId?: string;
 }
 
 export interface ChatMessage {
@@ -35,6 +38,9 @@ export interface Artifact {
   fileType: string;
   fileSize: number;
   downloadUrl: string;
+  liveUrl?: string;
+  previewUrl?: string;
+  siteId?: string;
   metadata?: {
     slides?: number;
     images?: number;

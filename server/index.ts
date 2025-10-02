@@ -39,49 +39,67 @@ app.use((req, res, next) => {
   next();
 });
 
-// ────────── Generated Sites Listing API ──────────
-app.get("/api/sites", async (_req, res) => {
-  try {
-    if (!fs.existsSync(SITES_DIR)) {
-      return res.json([]);
-    }
-    const dirs = await fs.promises.readdir(SITES_DIR);
-    const sites = await Promise.all(
-      dirs.map(async (id) => {
-        const manifestPath = path.join(SITES_DIR, id, "manifest.json");
-        if (fs.existsSync(manifestPath)) {
-          const manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf-8"));
-          return manifest;
-        }
-        return null;
-      })
-    );
-    res.json(sites.filter(Boolean));
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ────────── Serve Generated Static Sites (BEFORE Vite) ──────────
-app.get("/sites/:id/*", (req, res, next) => {
-  if (!/^[a-zA-Z0-9_-]+$/.test(req.params.id)) {
-    return res.status(400).send("Invalid site ID");
-  }
-  next();
-});
-
-app.use("/sites", express.static(SITES_DIR, {
-  index: "index.html",
-  extensions: ["html"],
-  fallthrough: true,
-  setHeaders(res) {
-    res.setHeader("Cache-Control", "no-store");
-  }
-}));
-
 // ────────── bootstrap ──────────
 (async () => {
+  // Register API routes FIRST, before Vite
   const server = await registerRoutes(app);
+  
+  // ────────── Generated Sites Listing API ──────────
+  app.get("/api/sites", async (_req, res) => {
+    try {
+      if (!fs.existsSync(SITES_DIR)) {
+        return res.json([]);
+      }
+      const dirs = await fs.promises.readdir(SITES_DIR);
+      const sites = await Promise.all(
+        dirs.map(async (id) => {
+          const manifestPath = path.join(SITES_DIR, id, "manifest.json");
+          if (fs.existsSync(manifestPath)) {
+            const manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf-8"));
+            return manifest;
+          }
+          return null;
+        })
+      );
+      res.json(sites.filter(Boolean));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ────────── Serve Generated Static Sites (BEFORE Vite) ──────────
+  app.get("/sites/:id/*", (req, res, next) => {
+    const siteId = req.params.id;
+    
+    // Validate site ID
+    if (!/^[a-zA-Z0-9_-]+$/.test(siteId)) {
+      return res.status(400).send("Invalid site ID");
+    }
+    
+    // Get requested path (everything after /sites/:id/)
+    let requestedPath = req.params[0] || "";
+    if (!requestedPath || requestedPath === "/") {
+      requestedPath = "index.html";
+    }
+    
+    // Resolve full file path
+    const siteDir = path.join(SITES_DIR, siteId);
+    const filePath = path.join(siteDir, requestedPath);
+    
+    // Security: ensure path is within site directory
+    if (!filePath.startsWith(siteDir)) {
+      return res.status(403).send("Forbidden");
+    }
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+      return res.status(404).send("File not found");
+    }
+    
+    // Set cache control and send file (this completes response, Vite won't run)
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(filePath);
+  });
 
   // ---------- OpenAI Text-to-Speech proxy ----------
   app.post("/api/tts", async (req: Request, res: Response) => {

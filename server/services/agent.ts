@@ -318,6 +318,9 @@ class AgentService {
           fileType: fmt,
           fileSize: result.fileSize,
           downloadUrl,
+          liveUrl: result.liveUrl,
+          previewUrl: result.previewUrl,
+          siteId: result.siteId,
           metadata: result.metadata,
           createdAt: new Date(),
         });

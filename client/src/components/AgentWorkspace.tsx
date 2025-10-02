@@ -290,25 +290,53 @@ export function AgentWorkspace(p: Props) {
                             {m.attachments.map((att: ArtifactRef) => (
                               <div
                                 key={att.id}
-                                className="flex items-center gap-2 p-2 bg-slate-100 dark:bg-slate-800 rounded border"
+                                className="flex flex-col gap-2 p-2 bg-slate-100 dark:bg-slate-800 rounded border"
                               >
-                                <span className="text-lg">{icon(att.fileType)}</span>
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-medium truncate">
-                                    {att.filename}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">{icon(att.fileType)}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-medium truncate">
+                                      {att.filename}
+                                    </div>
+                                    <div className="text-xs text-slate-500">
+                                      {fmtSize(att.fileSize)}
+                                    </div>
                                   </div>
-                                  <div className="text-xs text-slate-500">
-                                    {fmtSize(att.fileSize)}
-                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => window.open(att.downloadUrl, "_blank")}
+                                    data-testid={`button-download-${att.id}`}
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </Button>
                                 </div>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => window.open(att.downloadUrl, "_blank")}
-                                  data-testid={`button-download-${att.id}`}
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                </Button>
+                                {att.liveUrl && (
+                                  <div className="flex gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      className="flex-1"
+                                      onClick={() => window.open(att.liveUrl, "_blank")}
+                                      data-testid={`button-open-website-${att.id}`}
+                                    >
+                                      <Globe className="w-3.5 h-3.5 mr-1" />
+                                      Open Website
+                                    </Button>
+                                    {att.previewUrl && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1"
+                                        onClick={() => window.open(att.previewUrl, "_self")}
+                                        data-testid={`button-preview-inline-${att.id}`}
+                                      >
+                                        <Eye className="w-3.5 h-3.5 mr-1" />
+                                        Preview
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -438,23 +466,62 @@ export function AgentWorkspace(p: Props) {
                                   </div>
                                 )}
                               </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => p.onPreviewArtifact(a)}
-                                  data-testid={`button-preview-${a.id}`}
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => p.onDownloadArtifact(a)}
-                                  data-testid={`button-download-${a.id}`}
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                </Button>
+                              <div className="flex flex-col gap-1">
+                                {a.liveUrl ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => window.open(a.liveUrl, "_blank")}
+                                      data-testid={`button-open-website-${a.id}`}
+                                      className="w-full"
+                                    >
+                                      <Globe className="w-3.5 h-3.5 mr-1" />
+                                      Open
+                                    </Button>
+                                    {a.previewUrl && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => window.open(a.previewUrl, "_self")}
+                                        data-testid={`button-preview-${a.id}`}
+                                        className="w-full"
+                                      >
+                                        <Eye className="w-3.5 h-3.5 mr-1" />
+                                        Preview
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => p.onDownloadArtifact(a)}
+                                      data-testid={`button-download-${a.id}`}
+                                      className="w-full"
+                                    >
+                                      <Download className="w-3.5 h-3.5 mr-1" />
+                                      ZIP
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <div className="flex gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => p.onPreviewArtifact(a)}
+                                      data-testid={`button-preview-${a.id}`}
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => p.onDownloadArtifact(a)}
+                                      data-testid={`button-download-${a.id}`}
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </CardContent>
