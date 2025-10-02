@@ -1,0 +1,185 @@
+“architecturally impossible” line is BS. You can serve generated static sites side-by-side with your React app if you stop letting the React catch-all hijack everything. Here’s a hard, surgical directive you can paste to your Replit agent. It spells out exact changes, acceptance tests, and a rollback. No wiggle room.
+
+# FUERZA MAYOR DIRECTIVE — SERVE & PREVIEW GENERATED WEBSITES (NO EXCUSES)
+
+You will fix Agent Díaz **today**. The goal is simple:
+1) Keep the ZIP generator working.
+2) ALSO host each generated multi-page static site under `/sites/:id/` and make it clickable in both chat and the artifacts panel.
+3) Provide an in-app preview route `/preview/:id` that iframes `/sites/:id/`.
+
+If you claim “React/Vite intercepts everything”, you will **re-architect routing** so React only owns `/app/*`. Static sites get real HTTP paths.
+
+---
+
+## REQUIRED CHANGES (DO ALL)
+
+### 0) Repo assumptions
+- Server file: `server.cjs` (or `server.js`) using Express.
+- React/Vite frontend served from `/app/*`.
+- Generated sites currently written to a temporary folder before zipping.
+
+### 1) Persistent storage for generated sites
+- Create a durable folder, e.g. `./data/sites/<siteId>/` (mkdir -p).
+- After generation, write the **already-built** site into `./data/sites/<siteId>/` with:
+  - `index.html`
+  - `assets/**` (CSS/JS/img), **using relative paths** (`./assets/...`).  
+- If the generator outputs absolute paths, **post-process** `index.html` to inject `<base href="./">` once.
+
+### 2) Express static hosting that beats React’s catch-all
+- In `server.cjs`, mount static before any React wildcard:
+  ```js
+  const path = require("path");
+  const express = require("express");
+  const app = express();
+  const SITES_DIR = path.join(__dirname, "data", "sites");
+
+  // 2a) Serve listing JSON for UI
+  app.get("/sites.json", (_req,res) => {
+    // Return [{id, title, createdAt, url, previewUrl}] from fs
+  });
+
+  // 2b) Serve each generated site as-is
+  app.use("/sites", express.static(SITES_DIR, {
+    index: "index.html",
+    extensions: ["html"],
+    fallthrough: true,
+    setHeaders(res) { res.setHeader("Cache-Control","no-store"); }
+  }));
+
+  // 2c) Security: path traversal guard
+  app.get("/sites/:id/*", (req,res,next) => {
+    if(!/^[a-zA-Z0-9_-]+$/.test(req.params.id)) return res.status(400).send("Bad id");
+    return next();
+  });
+
+  // 2d) React/Vite must **not** own the whole domain.
+  // Change your existing catch-all from app.get("*", ...) to:
+  app.get("/app/*", (req,res) => { /* serve React index.html */ });
+
+
+If you use Vite dev middleware, scope it to /app/* only.
+
+3) Preview route inside React UI (no data URLs)
+
+Add a simple React page /app/preview/:id that renders:
+
+<iframe
+  src={`/sites/${id}/`}
+  style={{width:"100%", height:"calc(100vh - 120px)", border:"0"}}
+  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+/>
+
+
+Do not fetch and blob the HTML; load via URL so relative assets work.
+
+4) Chat + Artifact panel: deliver both ZIP and live URL
+
+After generation succeeds:
+
+Still create and attach the ZIP (unchanged).
+
+ALSO return:
+
+liveUrl: https://<host>/sites/<siteId>/
+
+previewUrl: https://<host>/app/preview/<siteId>
+
+In the chat message: show a BIG, single obvious button “Open Website”.
+
+In the artifact panel: pin an “Open Website” action that opens liveUrl in a new tab.
+
+5) Routing correctness (kill the myth)
+
+There must be no app.get("*", ...) at the root. If present, change it to /app/*.
+
+Order matters: app.use("/sites", express.static(...)) before any React middleware.
+
+If you insist on a reverse proxy, use http-proxy-middleware and mount React dev server under /app/ only. But the static approach above is mandatory.
+
+6) Build pipeline guardrails
+
+For every generated site:
+
+Ensure all <link> and <script> are relative (no absolute /).
+
+If a bundler emits hashed assets, keep the folder structure intact under data/sites/<id>/.
+
+Inject <base href="./"> if needed.
+
+On completion, write a manifest data/sites/<id>/manifest.json:
+
+{"id":"<id>","title":"<title>","createdAt":"<ISO>","liveUrl":"/sites/<id>/","previewUrl":"/app/preview/<id>"}
+
+7) Minimal listing page (optional but helpful)
+
+Add /app/sites that fetches /sites.json and renders a table with “Open Website” and “Open Preview” buttons.
+
+ACCEPTANCE CRITERIA (MUST PASS)
+
+Zip still works and downloads exactly as before.
+
+Hitting GET /sites/<id>/ in a browser renders the full multi-page site with working CSS/JS/images/links.
+
+React app is reachable at /app/* and does not intercept /sites/....
+
+A brand-new generated site shows two links in chat & artifacts:
+
+“Open Website” → /sites/<id>/
+
+“Preview in App” → /app/preview/<id>
+
+Hard refresh on /sites/<id>/ works without dev server, without iframes, and without special headers.
+
+Lighthouse smoke test ≥ 70 performance (no 404 assets).
+
+TEST PLAN (RUN ALL)
+
+Generate a site with at least 3 pages linking each other (relative links).
+
+curl -I /sites/<id>/index.html → 200
+
+curl -I /sites/<id>/assets/*.css → 200
+
+Browser: open /sites/<id>/ → navigate links → no 404s, no mixed content.
+
+Browser: open /app/preview/<id> → iframe loads the same, links work inside iframe.
+
+Confirm React routes still function under /app/*.
+
+LOGGING & DX
+
+On generation, log: siteId, output directory, page count, asset count.
+
+On first request to /sites/:id/, log resolved path to prove Express served the static asset (not React).
+
+Add /healthz returning {ok:true}.
+
+ROLLBACK
+
+If any acceptance criterion fails, do not delete the new code.
+
+Revert only the React catch-all to its prior state and keep the /sites static mount in place, disabled behind a feature flag ENABLE_HOSTED_SITES=false.
+
+Provide a one-line env switch to re-enable later.
+
+DELIVERABLES
+
+Updated server.cjs diff showing:
+
+New SITES_DIR static mount
+
+React catch-all scoped to /app/*
+
+New React route src/pages/Preview.jsx (or equivalent) with the iframe.
+
+Sample generated folder data/sites/demo/ committed for local testing.
+
+Demo video/gif: generate → click “Open Website” in chat → site loads at /sites/<id>/.
+
+
+### Why this works (and why the agent was wrong)
+- React/Vite only “intercepts everything” if you *let it* with a root `*` catch-all. Scope it to `/app/*` and it stops hijacking.  
+- Express static middleware **before** the catch-all serves real files at `/sites/...`.  
+- Relative assets + optional `<base href="./">` make multi-page sites portable anywhere, including subpaths like `/sites/:id/`.
+
+If you want, I can also generate the exact `server.cjs` patch next turn—line-for-line—based on your current file.

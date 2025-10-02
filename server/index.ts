@@ -1,5 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
 import axios from "axios";
+import path from "path";
+import fs from "fs";
 
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -7,6 +9,8 @@ import { setupVite, serveStatic, log } from "./vite";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+const SITES_DIR = path.join(process.cwd(), "data", "sites");
 
 // ────────── request-logging middleware ──────────
 app.use((req, res, next) => {
@@ -35,10 +39,45 @@ app.use((req, res, next) => {
   next();
 });
 
-// ────────── Static Website Routes (MUST be BEFORE Vite) ──────────
-app.use('/site', express.static('public/site'));
-app.use('/admin', express.static('public/admin'));
-app.get('/LAUNCH.html', (_req, res) => res.sendFile('LAUNCH.html', { root: 'public' }));
+// ────────── Generated Sites Listing API ──────────
+app.get("/api/sites", async (_req, res) => {
+  try {
+    if (!fs.existsSync(SITES_DIR)) {
+      return res.json([]);
+    }
+    const dirs = await fs.promises.readdir(SITES_DIR);
+    const sites = await Promise.all(
+      dirs.map(async (id) => {
+        const manifestPath = path.join(SITES_DIR, id, "manifest.json");
+        if (fs.existsSync(manifestPath)) {
+          const manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf-8"));
+          return manifest;
+        }
+        return null;
+      })
+    );
+    res.json(sites.filter(Boolean));
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ────────── Serve Generated Static Sites (BEFORE Vite) ──────────
+app.get("/sites/:id/*", (req, res, next) => {
+  if (!/^[a-zA-Z0-9_-]+$/.test(req.params.id)) {
+    return res.status(400).send("Invalid site ID");
+  }
+  next();
+});
+
+app.use("/sites", express.static(SITES_DIR, {
+  index: "index.html",
+  extensions: ["html"],
+  fallthrough: true,
+  setHeaders(res) {
+    res.setHeader("Cache-Control", "no-store");
+  }
+}));
 
 // ────────── bootstrap ──────────
 (async () => {
