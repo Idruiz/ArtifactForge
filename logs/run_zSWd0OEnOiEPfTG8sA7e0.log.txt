@@ -1,0 +1,17 @@
+[2025-10-02T02:56:11.983Z] [step_start] Starting: Planning content generation
+[2025-10-02T02:56:11.985Z] [trace] Generated 4 search queries
+[2025-10-02T02:56:11.987Z] [step_end] Completed: Planning content generation
+[2025-10-02T02:56:11.990Z] [step_start] Starting: Web research
+[2025-10-02T02:56:13.217Z] [trace] Found 24 search results
+[2025-10-02T02:56:13.234Z] [step_end] Completed: Web research
+[2025-10-02T02:56:15.849Z] [step_start] Starting: Generating content outline
+[2025-10-02T02:57:38.607Z] [trace] Generated outline with 14 slides
+[2025-10-02T02:57:38.610Z] [step_end] Completed: Generating content outline
+[2025-10-02T02:57:38.630Z] [step_start] Starting: Processing visual content
+[2025-10-02T02:57:46.909Z] [trace] Visuals → images: 14, charts: 8
+[2025-10-02T02:57:46.914Z] [step_end] Completed: Processing visual content
+[2025-10-02T02:57:46.919Z] [step_start] Starting: Building WEBSITE
+[2025-10-02T02:57:46.921Z] [step_start] Starting: Building website
+[2025-10-02T02:57:46.931Z] [step_end] Completed: Building website
+[2025-10-02T02:57:46.946Z] [step_end] Completed: Building WEBSITE
+[2025-10-02T02:57:46.954Z] [delivery] ✅ Artifacts emitted: Website_Plan_Renewable_Energy_Solutions_2025-readyWebsite_2025-10-02T02-57-46.html

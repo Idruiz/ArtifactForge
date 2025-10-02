@@ -2024,32 +2024,6 @@ function doOptions(e) {
     });
 }`;
   }
-  
-  private async createWebsiteZip(files: Record<string, string>): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      const bufferStream = new Writable({
-        write(chunk, encoding, callback) {
-          chunks.push(Buffer.from(chunk));
-          callback();
-        },
-      });
-      
-      const archive = archiver('zip', { zlib: { level: 9 } });
-      
-      archive.on('error', reject);
-      archive.on('end', () => resolve(Buffer.concat(chunks)));
-      
-      archive.pipe(bufferStream);
-      
-      // Add all files to zip
-      for (const [filepath, content] of Object.entries(files)) {
-        archive.append(content, { name: filepath });
-      }
-      
-      archive.finalize();
-    });
-  }
 
   /* ──────────────────────────── DOCX ──────────────────────────── */
 
@@ -2508,32 +2482,27 @@ function doOptions(e) {
     sources?: string[],
   ): Promise<BuildResult> {
     await logger.stepStart(taskId, "Building multi-page website with admin panel");
+    await logger.trace(taskId, 'buildWebsite: Starting ZIP generation');
     const theme = deriveTheme(title);
     
-    // Distribute slides across pages: Home, About, Projects, Contact
     const sections = this.distributeSlidesToWebsitePages(slides);
-    
-    // Generate shared CSS
     const stylesCSS = this.generateWebsiteCSS(theme);
-    
-    // Generate shared JS (navigation highlighting + admin button logic)
     const appJS = this.generateWebsiteJS();
     
-    // Generate individual HTML pages
     const indexHTML = this.generateWebsitePageHTML('Home', 'index.html', sections.home, theme, title);
     const aboutHTML = this.generateWebsitePageHTML('About', 'about.html', sections.about, theme, title);
     const projectsHTML = this.generateWebsitePageHTML('Projects', 'projects.html', sections.projects, theme, title);
     const contactHTML = this.generateWebsitePageHTML('Contact', 'contact.html', sections.contact, theme, title);
+    await logger.trace(taskId, 'buildWebsite: Generated 4 HTML pages');
     
-    // Generate admin panel files
     const adminHTML = this.generateAdminHTML();
     const adminJS = this.generateAdminJS();
-    
-    // Generate Apps Script backend
     const contentApiGS = this.generateAppsScriptBackend();
+    await logger.trace(taskId, 'buildWebsite: Generated admin and Apps Script files');
     
-    // Create zip bundle
     const zipFilename = makeFilename(`${title}_Website`, "zip");
+    await logger.trace(taskId, `buildWebsite: Will create ZIP as ${zipFilename}`);
+    
     const zipBuffer = await this.createWebsiteZip({
       'index.html': indexHTML,
       'about.html': aboutHTML,
@@ -2545,11 +2514,13 @@ function doOptions(e) {
       'admin/admin.js': adminJS,
       'apps_script/ContentApi.gs': contentApiGS,
     });
+    await logger.trace(taskId, `buildWebsite: ZIP buffer created, ${zipBuffer.length} bytes`);
     
     const filePath = await fileStorage.saveFile(zipFilename, zipBuffer);
     const { size } = await fileStorage.getFileStats(zipFilename);
     
     await logger.stepEnd(taskId, "Built multi-page website bundle");
+    await logger.trace(taskId, `buildWebsite: Returning ZIP ${zipFilename}, ${size} bytes`);
     return {
       filename: zipFilename,
       fileSize: size,
@@ -2842,6 +2813,34 @@ document.addEventListener('DOMContentLoaded', () => {
   <script src="app.js"></script>
 </body>
 </html>`;
+  }
+  
+  private async createWebsiteZip(files: Record<string, string>): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      const buffers: Buffer[] = [];
+      
+      const bufferStream = new Writable({
+        write(chunk, encoding, callback) {
+          buffers.push(chunk);
+          callback();
+        }
+      });
+      
+      bufferStream.on('finish', () => {
+        resolve(Buffer.concat(buffers));
+      });
+      
+      archive.on('error', reject);
+      archive.pipe(bufferStream);
+      
+      // Add all files to zip
+      for (const [path, content] of Object.entries(files)) {
+        archive.append(content, { name: path });
+      }
+      
+      archive.finalize();
+    });
   }
 
   /* ─────────────────────── Derived fallback charts (donuts only) ─────────────────────── */

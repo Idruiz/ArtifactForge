@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="This presentation outlines a practical, research-grounded plan to build a professional solar energy website that attracts leads, communicates credibility, and …">
+  <title>Build a High-Performing Solar Energy Website: Strategy, Design, and Launch Plan</title>
+  <style>
+    :root {
+      --primary: #14b8a6;
+      --secondary: #60a5fa;
+      --bg: #0b1020;
+      --text: #e2e8f0;
+      --mute: #94a3b8;
+      --card: #0f172a;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+    }
+    
+    nav {
+      background: var(--card);
+      padding: 1rem 2rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+    
+    nav .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    nav a {
+      color: var(--text);
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.3s ease;
+    }
+    
+    nav a:hover {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .hero {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      padding: 5rem 2rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .hero h1 {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .hero p {
+      font-size: 1.25rem;
+      max-width: 700px;
+      margin: 0 auto 2rem;
+      opacity: 0.95;
+    }
+    
+    
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('https://pixabay.com/get/g13f4ff63b2c424c5a3ef5c5469f79f35fe7e49a69854c597b4f90d44ae9c2803b76af0703fd45056f2fb0504e10d4b63d906cf76001f94181e95da8af0195bb3_1280.jpg') center/cover;
+      opacity: 0.2;
+      z-index: 0;
+    }
+    
+    .hero > * {
+      position: relative;
+      z-index: 1;
+    }
+    
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    .content-section {
+      margin: 4rem 0;
+      padding: 3rem;
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    
+    .content-section.split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      align-items: center;
+    }
+    
+    .content-section h2 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
+    }
+    
+    .content-section p {
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+    
+    .content-section ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    
+    .content-section li {
+      padding: 0.5rem 0;
+      padding-left: 1.5rem;
+      position: relative;
+    }
+    
+    .content-section li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--primary);
+      font-weight: bold;
+    }
+    
+    .section-media img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+    
+    footer {
+      background: var(--card);
+      padding: 3rem 2rem;
+      margin-top: 4rem;
+      text-align: center;
+      border-top: 3px solid var(--primary);
+    }
+    
+    .references {
+      background: var(--bg);
+      padding: 2rem;
+      border-radius: 8px;
+      margin: 2rem 0;
+    }
+    
+    .references h3 {
+      color: var(--primary);
+      margin-bottom: 1rem;
+    }
+    
+    .references ul {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .references li {
+      padding: 0.5rem 0;
+    }
+    
+    .references a {
+      color: var(--secondary);
+      text-decoration: none;
+      word-break: break-all;
+    }
+    
+    .references a:hover {
+      text-decoration: underline;
+    }
+    
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2rem; }
+      .hero p { font-size: 1rem; }
+      nav { flex-direction: column; gap: 0.5rem; }
+      .content-section.split {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">Build a High-Performing Solar Energy Website: Strategy, Design, and Launch Plan</div>
+    <a href="#section-1">Market Opportunity &amp; Industry Context</a><a href="#section-2">Target Audience &amp; User Personas</a><a href="#section-3">Design Principles &amp; Template Selection</a><a href="#section-4">AI-Powered Builder Workflow (Wegic.ai Case)</a><a href="#section-5">Content Strategy: Pages, Messaging, and Trust Signals</a><a href="#section-6">SEO, Performance &amp; Mobile Optimization</a><a href="#section-7">Conversion Optimization: CTAs, Forms, and Funnels</a><a href="#section-8">Case Studies &amp; Design Examples from the Field</a><a href="#section-9">Technical Architecture &amp; CMS Recommendations</a><a href="#section-10">Launch Plan, Analytics &amp; KPIs</a>
+  </nav>
+  
+  <div class="hero">
+    <h1>Build a High-Performing Solar Energy Website: Strategy, Design, and Launch Plan</h1>
+    <p>This presentation outlines a practical, research-grounded plan to build a professional solar energy website that attracts leads, communicates credibility, and …</p>
+  </div>
+  
+  <div class="container">
+    
+        <section id="section-1" class="content-section split">
+          <div class="section-content">
+            <h2>Market Opportunity &amp; Industry Context</h2>
+            <p>Understanding market dynamics is essential to positioning a solar website. Solar Industry Research Data from SEIA provides the industry backdrop: solar growth,…</p>
+            <ul><li>Use SEIA research to define content pillars and regional priorities</li><li>Align messaging with adoption drivers: savings, incentives, environment</li><li>Leverage industry stats on landing pages and case studies for trust</li></ul>
+          </div>
+          <div class="section-media"><img src="https://pixabay.com/get/gdf708c1f79e36e9ffbcc875c912cd23ae4d857ea024cf476dfd4f2409571e550eca16aab8c48b881165dca767a0a09a9af2002c3473a5f3ef67820bf3b4d7843_1280.jpg" alt="Market Opportunity &amp; Industry Context" loading="lazy" /></div>
+        </section>
+        <section id="section-2" class="content-section split">
+          <div class="section-content">
+            <h2>Target Audience &amp; User Personas</h2>
+            <p>Define primary and secondary audiences with clear personas to guide content and flows. Primary personas often include homeowners researching residential PV, co…</p>
+            <ul><li>Primary personas: homeowners, commercial buyers, partner installers</li><li>Map tasks: estimate costs, check incentives, request quotes</li><li>Use design cues from CyberOptik and MotoCMS to reduce friction</li></ul>
+          </div>
+          <div class="section-media"><img src="https://pixabay.com/get/g448e644317e233a2be93ea7580bd60d2f030ede26c733c1e4202e92df8f16f089a4baeffaed835e27adf5fb7f5de97784c10da93695496540d936028f9263a14_1280.jpg" alt="Target Audience &amp; User Personas" loading="lazy" /></div>
+        </section>
+        <section id="section-3" class="content-section split">
+          <div class="section-content">
+            <h2>Design Principles &amp; Template Selection</h2>
+            <p>Adopt a clean, responsive design that balances strong visuals with conversion-focused hierarchy. Resources such as 28 Best Wind &amp; Solar Energy Website Template…</p>
+            <ul><li>Choose responsive templates with built-in CTAs and galleries</li><li>Leverage Colorlib and Webflow examples to benchmark patterns</li><li>Consider AI-generated skeletons (Wegic.ai) for rapid prototyping</li></ul>
+          </div>
+          <div class="section-media"><img src="https://pixabay.com/get/g30b3e209e50b655bd0da9a4b26e896e4aa65f85f9c378a8904e44ee92b7ea21791e208f2d9bbd99f79f480db237c0e0127607f7f3ec6d1b7fbf436f6bd1f4c7d_1280.jpg" alt="Design Principles &amp; Template Selection" loading="lazy" /></div>
+        </section>
+        <section id="section-4" class="content-section split">
+          <div class="section-content">
+            <h2>AI-Powered Builder Workflow (Wegic.ai Case)</h2>
+            <p>Leverage AI-assisted tools to accelerate initial build and personalization. Best AI Solar Energy Website Builder 2025 | Wegic.ai describes an AI workflow that …</p>
+            <ul><li>Use Wegic.ai to generate a personalized site skeleton quickly</li><li>Treat AI output as draft: refine technical specs, localize incentives</li><li>Hybrid workflow: AI draft → designer/copywriter refinement → QA</li></ul>
+          </div>
+          <div class="section-media"><img src="https://pixabay.com/get/gace4a2b85779cdc35a39f2ddaac7d6ca22e0bf86d0795c877299a02b3441c948e5d1fe59ea7eb5f5d168ee1a1849b9109a99d4fd7d372948b0156dbf35512c9f_1280.jpg" alt="AI-Powered Builder Workflow (Wegic.ai Case)" loading="lazy" /></div>
+        </section>
+        <section id="section-5" class="content-section split">
+          <div class="section-content">
+            <h2>Content Strategy: Pages, Messaging, and Trust Signals</h2>
+            <p>Create a content plan that educates, persuades, and converts. CyberOptik's guidance on solar website designs emphasizes trust-building elements and clear CTAs;…</p>
+            <ul><li>Core pages: homepage, services, portfolio, financing, FAQs, blog</li><li>Highlight trust: certifications, warranties, testimonials, case studies</li><li>Use SEIA-backed content for authority and location-specific pages</li></ul>
+          </div>
+          <div class="section-media"><img src="https://pixabay.com/get/gd86b50050c2ae45e332ce14b360382483c10da8ac009c8e4e2cc13b616f7484068fefe0cfe08cbeefb20760a3b5281e70a02cba4c5ee9760fd29a747f5dc919a_1280.jpg" alt="Content Strategy: Pages, Messaging, and Trust Signals" loading="lazy" /></div>
+        </section>
+        <section id="section-6" class="content-section split">
+          <div class="section-content">
+            <h2>SEO, Performance &amp; Mobile Optimization</h2>
+            <p>Search visibility and site speed are primary acquisition channels for solar businesses. CyberOptik stresses mobile-first design and fast load times to reduce b…</p>
+            <ul><li>Implement on-page SEO, local schema, and keyword-targeted pages</li><li>Optimize performance: image compression, CDN, and caching</li><li>Prioritize mobile-first UX with touch-friendly CTAs and fast loads</li></ul>
+          </div>
+          <div class="section-media"><img src="https://pixabay.com/get/g49a1cdef05a0bf264ab5462e58bde0a5c0fc9a9a127711753823e76ec16adda9c8ea9555ed487ce5bfac9ad2f8742cc4724d99d706bc210d8b7b0e9a66f1d815_1280.jpg" alt="SEO, Performance &amp; Mobile Optimization" loading="lazy" /></div>
+        </section>
+        <section id="section-7" class="content-section split">
+          <div class="section-content">
+            <h2>Conversion Optimization: CTAs, Forms, and Funnels</h2>
+            <p>Design clear conversion funnels tailored to user intent. CyberOptik recommends prominent CTAs like 'Get a Free Quote' and 'Schedule a Consultation' to increase…</p>
+            <ul><li>Use clear CTAs and multi-step forms to capture qualified leads</li><li>A/B test CTA language and placement using Webflow/Colorlib patterns</li><li>Integrate validated savings calculators to increase quote requests</li></ul>
+          </div>
+          <div class="section-media"><img src="https://pixabay.com/get/g4f7fde28be981ee3cf5564d13466df185e01897689f6ffbcb648f0de16f8a5222008e7f2ce63d3364f1f863f8de386f26d7ce290ba15692130946c25f5a3b98e_1280.jpg" alt="Conversion Optimization: CTAs, Forms, and Funnels" loading="lazy" /></div>
+        </section>
+        <section id="section-8" class="content-section split">
+          <div class="section-content">
+            <h2>Case Studies &amp; Design Examples from the Field</h2>
+            <p>Draw inspiration from curated examples to define aesthetic and interaction targets. Best Solar Websites | Free Examples &amp; Designs - Webflow showcases productio…</p>
+            <ul><li>Use Webflow and Colorlib examples as benchmarks for interactions and layout</li><li>Extract a component library: hero, trust band, gallery, financing module</li><li>Document accessibility and responsive behavior for each component</li></ul>
+          </div>
+          <div class="section-media"><img src="https://pixabay.com/get/g2e8846c0a6ca7102ae89b108b01936694dd4007cb1e6d88ee2bd21f4768c383f556ac5442191e87d0d3a903d90fba1350c625f8e47257f6e6e78de7ec22e58c7_1280.jpg" alt="Case Studies &amp; Design Examples from the Field" loading="lazy" /></div>
+        </section>
+        <section id="section-9" class="content-section split">
+          <div class="section-content">
+            <h2>Technical Architecture &amp; CMS Recommendations</h2>
+            <p>Select a technical stack that balances speed, maintainability, and marketing flexibility. Options range from managed sites built with Wegic.ai or Webflow for r…</p>
+            <ul><li>Choose managed builders (Wegic.ai/Webflow) for speed; headless for scale</li><li>Integrate CMS with CRM for automatic lead routing and qualification</li><li>Include analytics, A/B testing, backups, and role-based access</li></ul>
+          </div>
+          <div class="section-media"><img src="https://pixabay.com/get/g1f8a876bada5c174c0ffb1e1ee2242fdd753558209f47dbcef231e338472069d072faa50585cca8f05d8912f72cbd8aaf050e00e99fc6ebe2530dc8b870d5ee6_1280.jpg" alt="Technical Architecture &amp; CMS Recommendations" loading="lazy" /></div>
+        </section>
+        <section id="section-10" class="content-section split">
+          <div class="section-content">
+            <h2>Launch Plan, Analytics &amp; KPIs</h2>
+            <p>Create a phased launch plan with measurable KPIs. Use a pre-launch checklist: QA across devices, SEO crawlability, form validation, analytics setup, and CDN co…</p>
+            <ul><li>Pre-launch QA: devices, SEO crawlability, form validation, analytics</li><li>KPIs: organic traffic, leads, conversion rate, cost-per-lead</li><li>90-day plan: CRO tests, content updates, monthly performance reviews</li></ul>
+          </div>
+          <div class="section-media"><img src="https://pixabay.com/get/gea8c5c4f2bf6654a43a645ff7a1bd235cd4f7887e1404d49f0c2c7cee64fa48009a9a3ff7df1c9a82cadc6cccf3dfdee_1280.jpg" alt="Launch Plan, Analytics &amp; KPIs" loading="lazy" /></div>
+        </section>
+  </div>
+  
+  <footer>
+    <div class="references"><h3>References & Sources</h3><ul><li><a href="https://wegic.ai/ai-website-builder/solar-energy" target="_blank" rel="noopener">https://wegic.ai/ai-website-builder/solar-energy</a></li><li><a href="https://colorlib.com/wp/alternative-energy-website-templates/" target="_blank" rel="noopener">https://colorlib.com/wp/alternative-energy-website-templates/</a></li><li><a href="https://www.cyberoptik.net/blog/best-solar-website-designs/" target="_blank" rel="noopener">https://www.cyberoptik.net/blog/best-solar-website-designs/</a></li><li><a href="https://www.motocms.com/blog/en/solar-energy-website-guide-examples/" target="_blank" rel="noopener">https://www.motocms.com/blog/en/solar-energy-website-guide-examples/</a></li><li><a href="https://webflow.com/made-in-webflow/solar" target="_blank" rel="noopener">https://webflow.com/made-in-webflow/solar</a></li><li><a href="https://seia.org/research-resources/solar-industry-research-data/" target="_blank" rel="noopener">https://seia.org/research-resources/solar-industry-research-data/</a></li><li><a href="https://elfsight.com/solutions/solar-company-website-template/" target="_blank" rel="noopener">https://elfsight.com/solutions/solar-company-website-template/</a></li><li><a href="https://ourworldindata.org/grapher/solar-energy-consumption" target="_blank" rel="noopener">https://ourworldindata.org/grapher/solar-energy-consumption</a></li><li><a href="https://theroundup.org/solar-power-statistics/" target="_blank" rel="noopener">https://theroundup.org/solar-power-statistics/</a></li><li><a href="https://datarade.ai/data-categories/solar-energy-data" target="_blank" rel="noopener">https://datarade.ai/data-categories/solar-energy-data</a></li></ul></div>
+    <p style="margin-top: 2rem; color: var(--mute);">
+      © 2025 Build a High-Performing Solar Energy Website: Strategy, Design, and Launch Plan. Generated by Agent Diaz.
+    </p>
+  </footer>
+</body>
+</html>
