@@ -1,0 +1,70 @@
+TITLE: STOP BURNING MY FUNDS — DELIVER THE ACTUAL WEBSITE + ADMIN SUB-ARTIFACT NOW (NO PARTIALS)
+
+READ FIRST (MANDATORY):
+You’ve shipped folders without the product. That’s wasting my money. This task is NOT exploratory. It is a delivery. Do not reply until you have written the required files to the repo AND included their full contents in your message as code blocks AND attached them as artifacts.
+
+DELIVERABLES — EXACT FILES (ALL REQUIRED)
+A) ROOT LAUNCHER (non-dev friendly)
+  - /LAUNCH.html → Big emoji buttons. One-click open to each page:
+      • “🏠 Open Home” → /site/index.html
+      • “ℹ️ Open About” → /site/about.html
+      • “🛠️ Open Projects” → /site/projects.html
+      • “✉️ Open Contact” → /site/contact.html
+      • “🔐 Admin (token)” → /admin/index.html?admin=1
+  - /README.md → Updated run steps.
+
+B) WEBSITE (multi-page bundle — NOT single page)
+  - /site/index.html
+  - /site/about.html
+  - /site/projects.html
+  - /site/contact.html
+  - /site/styles.css
+  - /site/app.js
+  Rules:
+   • Headers link to the correct PAGE (no in-page anchors).
+   • Active nav highlight persists across pages.
+   • Copy is concise/professional (≤3-word headers).
+   • ZERO prompt/system text leaks.
+
+C) ADMIN SUB-ARTIFACT (fully working)
+  - /admin/index.html (minimal UI, discreet in public, full CRUD when `?admin=1` or token in localStorage)
+  - /admin/admin.js
+  - /apps_script/ContentApi.gs  (Google Apps Script backend)
+      • doGet(e):
+          GET /content → JSON: { sections: { home:[], about:[], projects:[], contact:[] } }
+          GET /admin   → serves admin page (optional)
+      • doPost(e):
+          action=create|update|delete; section; id; title; body; token
+      • Use Script Properties for TOKEN. No secrets in client.
+
+D) SERVER + STARTUP
+  - /server.js serves /site with clean routes for /, /about, /projects, /contact and /LAUNCH.html as root.
+  - /package.json has "start": "node server.js".
+
+E) DOCX REPORT & CAR MODE — NO REGRESSIONS
+  - DOCX artifact must embed charts as PNGs (no raw QuickChart URLs as text); readable styles.
+  - Car Mode must NOT be stuck in “listening”; must do 3s VAD → finalize → transcribe → send → respond → idle (single send per utterance; no looped replies).
+
+WHAT TO INCLUDE IN YOUR REPLY (NON-NEGOTIABLE)
+1) Full file contents for every file listed above in separate code blocks.
+2) Confirmation that files were written to the repo (paths).
+3) Two artifacts attached: “Website bundle” (/site) and “Admin bundle” (/admin + /apps_script).
+4) Quick test notes you actually ran:
+   • Click each header → correct page loads (not an anchor).
+   • Leak check passes: no `/system|prompt|instruction/i` in output HTML.
+   • Admin: create → edit → delete → persisted via ContentApi.gs (show request/response logs).
+   • DOCX opens with ≥3 embedded charts; HTML contains no chart URLs.
+   • Car Mode flows: Listening → Finalize (3s) → Transcribe → Send → Respond → Idle; no “repeat last message.”
+
+FAIL CONDITIONS (DO NOT DO THESE):
+- Creating folders without files.
+- Claiming “done” without the exact files above.
+- Shipping single-page site when I asked for multi-page.
+- Admin UI stubbed or disabled—this must work.
+- Any regression in Car Mode or DOCX charts.
+- Any prompt/system text in the public HTML.
+
+IF BLOCKED:
+State the exact file and line causing the block, ship a minimal reversible fix behind a feature flag, and proceed. Do not stop or downscope without explicit instruction.
+
+This is a final, non-destructive fix pass. Deliver **everything** above in one go, correctly, or don’t reply.
