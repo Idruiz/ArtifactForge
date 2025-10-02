@@ -35,6 +35,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// ────────── Static Website Routes (MUST be BEFORE Vite) ──────────
+app.use('/site', express.static('public/site'));
+app.use('/admin', express.static('public/admin'));
+app.get('/LAUNCH.html', (_req, res) => res.sendFile('LAUNCH.html', { root: 'public' }));
+
 // ────────── bootstrap ──────────
 (async () => {
   const server = await registerRoutes(app);

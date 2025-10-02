@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #1a202c;
+      color: #e2e8f0;
+      padding: 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { margin-bottom: 30px; color: #48bb78; }
+    .auth-screen, .admin-screen { display: none; }
+    .auth-screen.active, .admin-screen.active { display: block; }
+    input, textarea, select, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #4a5568;
+      border-radius: 6px;
+      background: #2d3748;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+    button {
+      background: #48bb78;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      border: none;
+    }
+    button:hover { background: #38a169; }
+    .btn-danger { background: #f56565; }
+    .btn-danger:hover { background: #e53e3e; }
+    .btn-secondary { background: #4299e1; }
+    .btn-secondary:hover { background: #3182ce; }
+    .section-tabs {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+    }
+    .tab {
+      padding: 10px 20px;
+      background: #2d3748;
+      border: 2px solid #4a5568;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab.active {
+      background: #48bb78;
+      border-color: #48bb78;
+      color: white;
+    }
+    .articles {
+      display: grid;
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .article-card {
+      background: #2d3748;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #4a5568;
+    }
+    .article-card h3 { color: #48bb78; margin-bottom: 10px; }
+    .article-card p { color: #cbd5e0; margin-bottom: 15px; }
+    .article-actions { display: flex; gap: 10px; }
+    .article-actions button { width: auto; padding: 8px 16px; }
+    #editor { display: none; margin-top: 20px; padding: 20px; background: #2d3748; border-radius: 8px; }
+    #editor.active { display: block; }
+    .error { color: #fc8181; font-size: 12px; margin-top: -5px; }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1f2937;
+      color: white;
+      padding: 15px 25px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 1000;
+    }
+    .toast.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="auth-screen active" data-testid="auth-screen">
+      <h1>🔐 Admin Authentication</h1>
+      <input type="password" id="tokenInput" placeholder="Enter admin token" data-testid="input-token">
+      <div id="authError" class="error"></div>
+      <button onclick="authenticate()" data-testid="btn-authenticate">Authenticate</button>
+    </div>
+
+    <div class="admin-screen" data-testid="admin-screen">
+      <h1>📝 Content Management</h1>
+      <button onclick="logout()" class="btn-danger" data-testid="btn-logout">Logout</button>
+      
+      <div class="section-tabs" data-testid="section-tabs">
+        <div class="tab active" onclick="switchSection('home')" data-testid="tab-home">Home</div>
+        <div class="tab" onclick="switchSection('about')" data-testid="tab-about">About</div>
+        <div class="tab" onclick="switchSection('projects')" data-testid="tab-projects">Projects</div>
+        <div class="tab" onclick="switchSection('contact')" data-testid="tab-contact">Contact</div>
+      </div>
+
+      <button onclick="showEditor()" class="btn-secondary" data-testid="btn-create">+ Create New</button>
+
+      <div id="editor" data-testid="editor">
+        <h2 id="editorTitle">New Article</h2>
+        <input type="hidden" id="editId">
+        <input type="text" id="articleTitle" placeholder="Title" data-testid="input-title">
+        <div id="titleError" class="error"></div>
+        <textarea id="articleBody" rows="6" placeholder="Body" data-testid="input-body"></textarea>
+        <div id="bodyError" class="error"></div>
+        <button onclick="saveArticle()" data-testid="btn-save">Save</button>
+        <button onclick="cancelEdit()" class="btn-secondary" data-testid="btn-cancel">Cancel</button>
+      </div>
+
+      <div class="articles" id="articlesList" data-testid="articles-list"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
