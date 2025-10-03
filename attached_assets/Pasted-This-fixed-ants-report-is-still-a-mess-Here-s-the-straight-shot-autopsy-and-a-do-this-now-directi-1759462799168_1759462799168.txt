@@ -1,0 +1,167 @@
+This “fixed” ants report is still a mess. Here’s the straight-shot autopsy and a do-this-now directive for the Replit agent.
+
+What’s wrong with the “Life Cycle of Ants” DOCX
+1) Truncated, unfinished prose
+
+Multiple sections end mid-sentence with ellipses—Executive Summary, Results, etc. It’s clearly cut off during generation/assembly. 
+
+Comprehensive_DOCX_Report_Life_…
+
+2) Placeholder figures (no actual visuals)
+
+“Figure 1/2/3” exist in captions only; there are no embedded charts or images. It’s a label farm, not figures. 
+
+Comprehensive_DOCX_Report_Life_…
+
+3) Meta/template leakage posing as content
+
+The doc explains that it uses “categorical proportions (e.g., 4-stage cycle = 25% per stage)”—that’s a scaffolding hack, not biology. It admits the visuals are “pedagogic constructs” until data exists. This is a fancy way to say: placeholders. 
+
+Comprehensive_DOCX_Report_Life_…
+
+4) Bad/irrelevant sources, missing in-text citations
+
+References include Microsoft Create (template site), Galaxy.ai report generator, MisfitAnimals, a generic blog “entomologist.net,” and Studocu. These are not peer-reviewed or authoritative biology sources for lifecycle facts. No in-text citations tie claims to these references. 
+
+Comprehensive_DOCX_Report_Life_…
+
+One decent outreach source shows up (YourWildlife PDF), but it’s mixed with low-cred material. 
+
+Comprehensive_DOCX_Report_Life_…
+
+5) Hallucinated methodology and “methods” boilerplate
+
+“Research methodology included systematic data collection…” with no dataset, protocol, instruments, or variables. This is generic filler; nothing is reproducible. 
+
+Comprehensive_DOCX_Report_Life_…
+
+6) Not clearly about ants (beyond the title)
+
+The body contains generic “subject matter” wording and presentation boilerplate; almost no concrete, cited biology (e.g., stage durations, caste differentiation, species examples) made it into the text. 
+
+Comprehensive_DOCX_Report_Life_…
+
+7) Structure promises, content doesn’t deliver
+
+Sections exist (Executive Summary, Methods, Results, Discussion), but they’re skeletal and cut off. No tables, no stage timeline, no colony diagram, no glossary. 
+
+Comprehensive_DOCX_Report_Life_…
+
+8) Accessibility & formatting are performative
+
+Captions are there, but with no images; there’s no alt text, no table of figures, no styles beyond headings. 
+
+Comprehensive_DOCX_Report_Life_…
+
+9) “25% per stage” is pedagogically wrong
+
+Treating egg/larva/pupa/adult as equal “quarters” is misleading. Real stage durations vary widely by species and temperature. The doc pushes this 25% gimmick instead of either (a) citing a range or (b) clearly labeling it as a schematic—not data. 
+
+Comprehensive_DOCX_Report_Life_…
+
+Non-negotiable fix list for the Replit agent (one pass)
+A) Fail-closed content gate (no more half docs)
+
+Before export, validate a JSON payload. If any required field is empty, truncated, or meta-leaky, abort the export.
+
+Required sections & minima
+
+Cover: title, subtitle, author, date.
+
+Executive Summary: 250–400 words (complete sentences; no ellipses).
+
+Introduction: ≥600 words; defines 4 stages (egg, larva, pupa, adult) and distinguishes colony development vs individual lifecycle.
+
+Methods: concrete method or explicit “No primary data; literature synthesis only” label.
+
+Results: ≥600 words with ≥3 embedded figures (PNG) and ≥1 table.
+
+Discussion: ≥600 words; limitations + next steps.
+
+References: formatted (APA/CSL), mapped to in-text citations [Author, Year].
+
+Reject if body contains: slide|presentation|template|will include|pedagogic construct (case-insensitive).
+
+B) Source policy (replace the junk)
+
+Whitelist (examples): peer-reviewed journals; university/extension (.edu/.gov); museum/natural-history institutions.
+
+Blacklist in final references: template galleries (create.microsoft.com), AI “report generator” sites, Studocu, MisfitAnimals, generic blogs like “entomologist.net” unless the author is a credentialed entomologist with citable publication. Any blacklisted domain → export fails. (Current file contains several.) 
+
+Comprehensive_DOCX_Report_Life_…
+
+Enforce that each factual claim in Intro/Results has at least one in-text citation that resolves to the bibliography.
+
+C) Figures that are real (and accessible)
+
+Render charts/diagrams to PNG and embed (no raw URLs).
+
+Each figure: caption (F1, F2…), alt text, and 3–6 line interpretation.
+
+Include at least one schematic life-stage timeline and one colony caste diagram with honest labeling (“schematic” vs “empirical”) if no numeric durations are used.
+
+D) Table(s) with concrete, verifiable content
+
+Insert at least one table summarizing stage names, typical duration ranges by example species (citations), and notes. No invented numbers; if not available, use ranges from credible sources and cite.
+
+E) Accuracy & scope corrections
+
+Delete the “25% per stage” trick unless it’s clearly labeled diagrammatic and not used in analysis.
+
+Write explicit text on temperature/seasonality effects and species variability (cited).
+
+If no primary data is used, state that clearly and stop pretending “systematic data collection” happened.
+
+F) Truncation/overflow bug fix
+
+Audit the DOCX writer (e.g., python-docx or whatever you use):
+
+Ensure paragraph concatenation does not exceed library run limits.
+
+Disable silent token truncation; chunk long sections.
+
+Add a post-write “open & scan” check to catch trailing ellipses or empty figures.
+
+G) Final leakage & quality checks (automated)
+
+Leak check: reject if /slide|presentation|template|will include|pedagogic construct/i in the DOCX text.
+
+Figure presence: ≥3 images embedded as image/* parts.
+
+Alt text on all images.
+
+Citations: number of in-text [Author, Year] ≥ number of unique claims flagged by your sentence classifier.
+
+Blacklist domains absent from refs. (Current doc fails.) 
+
+Comprehensive_DOCX_Report_Life_…
+
+H) Packaging
+
+DOCX opens in Word/Google Docs with embedded images (not links).
+
+Optional: include a short “Further Reading” (3–5 vetted sources) separate from formal references.
+
+Paste-this directive to the agent
+
+Deliver a finished, accurate ants report, not scaffolding.
+
+Implement the fail-closed JSON schema above and refuse export on missing/truncated/meta content.
+
+Replace weak sources; only keep scholarly/.edu/.gov/natural-history. Remove Microsoft Create, Galaxy.ai, Studocu, MisfitAnimals, generic blogs. Add proper in-text citations that resolve to the bibliography. 
+
+Comprehensive_DOCX_Report_Life_…
+
+Embed ≥3 PNG figures with captions + alt text (life-stage timeline, colony caste diagram, and one optional chart). No placeholder captions.
+
+Add a table with stage names and cited duration ranges (or clearly mark as schematic if ranges aren’t available).
+
+Kill the “25% per stage” pseudo-quant; only keep it as a clearly labeled schematic, not data.
+
+Fix DOCX truncation—no ellipses mid-section; chunk/stream long paragraphs.
+
+Run leak checks, figure presence checks, alt-text checks, and blacklist checks. Fail the build if any trip.
+
+Return the DOCX as a downloadable artifact and paste a one-page Executive Summary excerpt in chat to prove it’s real, complete prose.
+
+If they “fix” it again without embedded figures, in-text citations, and complete prose, it’s not fixed—send them back to Step 1 and fail the export by design.

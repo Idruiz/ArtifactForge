@@ -13,6 +13,52 @@ import { builderService } from "./builder";
 import { logger } from "../utils/logger";
 import { fileStorage } from "../utils/fileStorage";
 
+// ─── SOURCE VETTING (Whitelist-First) ───
+const VETTED_DOMAINS = [
+  // Academic & Educational
+  '.edu', '.ac.uk', '.edu.au', 'scholar.google', 'researchgate.net',
+  // Government & Official
+  '.gov', '.gov.uk', '.gc.ca',
+  // Peer-Reviewed Journals & Publishers
+  'nature.com', 'science.org', 'sciencedirect.com', 'springer.com', 'wiley.com',
+  'ieee.org', 'acm.org', 'plos.org', 'frontiersin.org', 'mdpi.com',
+  // Scientific Institutions
+  'nih.gov', 'cdc.gov', 'who.int', 'nasa.gov', 'noaa.gov',
+  // Museums & Natural History
+  'smithsonian.edu', 'nhm.ac.uk', 'amnh.org', 'fieldmuseum.org',
+  // Encyclopedias & Reference (curated)
+  'wikipedia.org', 'britannica.com', 'sciencedaily.com',
+  // Reputable News/Science Media
+  'bbc.com/science', 'nationalgeographic.com', 'scientificamerican.com',
+];
+
+const BLACKLIST_DOMAINS = [
+  'microsoft.com/create', 'galaxy.ai', 'studocu.com', 'misfitanimals',
+  'scribd.com', 'geeksforgeeks.org', 'calculator.net', 'rapidtables.com',
+  'convertunits.com', 'symbolab.com', 'mathway.com', 'chegg.com',
+  'coursehero.com', 'quizlet.com', 'slideshare.net', 'prezi.com',
+];
+
+function isVettedSource(url: string): boolean {
+  const lower = url.toLowerCase();
+  
+  // Blacklist check first (immediate rejection)
+  if (BLACKLIST_DOMAINS.some(domain => lower.includes(domain))) {
+    return false;
+  }
+  
+  // Whitelist check (must match at least one)
+  return VETTED_DOMAINS.some(domain => lower.includes(domain));
+}
+
+interface VettedSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  source: string;
+  vetted: boolean;
+}
+
 type AgentStatus = "pending" | "processing" | "completed" | "failed";
 
 interface AgentTask {
@@ -190,8 +236,41 @@ class AgentService {
     await logger.trace(task.id, `Found ${total} search results`);
     await logger.stepEnd(task.id, "Web research");
 
-    // 2.5) Build meaningful research context from real pages
-    const { contextText, topUrls } = await this.gatherResearchContext(searchResults);
+    // 2.5) Vet sources (whitelist-first filtering)
+    await logger.stepStart(task.id, "Vetting sources");
+    const vettedResults: Record<string, any> = {};
+    let vettedCount = 0;
+    let rejectedCount = 0;
+    
+    for (const [query, response] of Object.entries(searchResults)) {
+      const results = Array.isArray(response?.results) ? response.results : [];
+      const vetted = results.filter((r: any) => {
+        const url = r?.url || '';
+        const isVetted = isVettedSource(url);
+        if (!isVetted) {
+          rejectedCount++;
+          logger.trace(task.id, `Rejected source: ${url.slice(0, 80)}`);
+        }
+        return isVetted;
+      });
+      
+      vettedCount += vetted.length;
+      vettedResults[query] = { results: vetted, totalResults: vetted.length };
+    }
+    
+    await logger.trace(task.id, `Source vetting: ${vettedCount} vetted, ${rejectedCount} rejected`);
+    
+    // Enforce minimum 3 vetted sources for reports/analysis
+    const isReportOrAnalysis = task.prompt.toLowerCase().match(/\b(report|analysis|study|research)\b/);
+    if (isReportOrAnalysis && vettedCount < 3) {
+      await logger.trace(task.id, `FAIL: Only ${vettedCount} vetted sources (minimum 3 required for reports)`);
+      throw new Error(`Insufficient quality sources: found ${vettedCount} vetted sources, minimum 3 required for academic/research content. Please try a more specific topic or check back later.`);
+    }
+    
+    await logger.stepEnd(task.id, "Vetting sources");
+
+    // 2.6) Build meaningful research context from vetted pages
+    const { contextText, topUrls } = await this.gatherResearchContext(vettedResults);
 
     // 3) Outline
     task.currentStep = "Creating content outline";
