@@ -691,6 +691,114 @@ class OpenAIService {
     return outline;
   }
 
+  /* ---------------- DOCX Sections (Orchestrator-driven) ---------------- */
+
+  async generateDOCXSections(
+    systemPrompt: string,
+    userPrompt: string,
+    developerPrompt: string,
+  ): Promise<any> {
+    if (!this.client) throw new Error("OpenAI not initialized");
+
+    const toolName = "DOCXSections";
+    const parameters = {
+      type: "object",
+      additionalProperties: false,
+      required: ["cover", "exec_summary", "sections", "figures", "tables"],
+      properties: {
+        cover: {
+          type: "object",
+          required: ["title", "subtitle"],
+          properties: {
+            title: { type: "string", minLength: 10 },
+            subtitle: { type: "string", minLength: 10 },
+            date: { type: "string" },
+          },
+        },
+        exec_summary: { type: "string", minLength: 200, maxLength: 500 },
+        sections: {
+          type: "array",
+          minItems: 3,
+          items: {
+            type: "object",
+            required: ["heading", "body"],
+            properties: {
+              heading: { type: "string", minLength: 5 },
+              body: { type: "string", minLength: 200 },
+              bullets: {
+                type: "array",
+                items: { type: "string", minLength: 10 },
+              },
+            },
+          },
+        },
+        figures: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["id", "caption", "chartSpec"],
+            properties: {
+              id: { type: "string" },
+              caption: { type: "string", minLength: 10 },
+              chartSpec: {
+                type: "object",
+                required: ["type", "data"],
+                properties: {
+                  type: { type: "string", enum: ["bar", "line", "scatter", "pie"] },
+                  title: { type: "string" },
+                  data: { type: "object", additionalProperties: true },
+                },
+              },
+            },
+          },
+        },
+        tables: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["caption", "headers", "rows"],
+            properties: {
+              caption: { type: "string", minLength: 10 },
+              headers: {
+                type: "array",
+                items: { type: "string" },
+              },
+              rows: {
+                type: "array",
+                items: {
+                  type: "array",
+                  items: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        references: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              authors: { type: "string" },
+              year: { type: "number" },
+              url: { type: "string" },
+            },
+          },
+        },
+      },
+    };
+
+    const result = await this.callTool<any>({
+      system: `${systemPrompt}\n\n${developerPrompt}`,
+      user: userPrompt,
+      toolName,
+      description: "Submit the complete DOCX sections with embedded figures and tables as JSON.",
+      parameters,
+    });
+
+    return result;
+  }
+
   /* ---------------- Persona prompt ---------------- */
 
   private getPersonaPrompt(persona: string, tone: string): string {
@@ -744,3 +852,4 @@ export const generateDataset = openaiService.generateDataset.bind(openaiService)
 export const generateQuiz = openaiService.generateQuiz.bind(openaiService);
 export const generateContentCalendar = openaiService.generateContentCalendar.bind(openaiService);
 export const generateFlowchart = openaiService.generateFlowchart.bind(openaiService);
+export const generateDOCXSections = openaiService.generateDOCXSections.bind(openaiService);

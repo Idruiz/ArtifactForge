@@ -6,12 +6,14 @@
 // - Backwards compatible with current routes (no signature changes)
 
 import { nanoid } from "nanoid";
-import { openaiService, generateRichOutline } from "./openai";
+import { openaiService, generateRichOutline, generateDOCXSections } from "./openai";
 import { searcherService } from "./searcher";
 import { visualMatcherService } from "./visualMatcher";
 import { builderService } from "./builder";
 import { logger } from "../utils/logger";
 import { fileStorage } from "../utils/fileStorage";
+import { RequestNormalizer } from "../prompt/normalizer";
+import { buildSystemMessage, buildUserMessage, buildDeveloperMessage } from "../prompt/orchestrator";
 
 // ─── SOURCE VETTING (Allowlist + Scoring) ───
 
@@ -314,13 +316,23 @@ class AgentService {
   }
 
   private async processContentGeneration(task: AgentTask) {
-    // INTENT ROUTER - determine pipeline
-    const router = this.detectPipelineIntent(task.prompt);
-    await logger.trace(task.id, `PIPELINE ROUTER: ${router.intent} (${router.reason})`);
+    // NORMALIZE INPUT - convert text/JSON → orchestrator schema
+    const normalizer = new RequestNormalizer();
+    const normalized = normalizer.normalize(task.prompt);
+    
+    await logger.trace(task.id, `REQUEST NORMALIZER: ${normalized.intent} (${normalized.reason})`);
+    await logger.trace(task.id, `DATA ORIGIN: ${normalized.dataOrigin}`);
+    
+    // Log structured data (sanitized)
+    if (normalized.intent === 'DATA_ANALYSIS_DOCX') {
+      await logger.trace(task.id, `Students: ${normalized.data.students?.length || 0}, Averages: ${JSON.stringify(normalized.data.class_averages || {})}`);
+    } else {
+      await logger.trace(task.id, `Topic: ${normalized.data.topic}`);
+    }
     
     // Route to appropriate pipeline
-    if (router.intent === 'DATA_ANALYSIS') {
-      return await this.processDataAnalysis(task);
+    if (normalized.intent === 'DATA_ANALYSIS_DOCX') {
+      return await this.processDataAnalysisDOCX(task, normalized);
     } else {
       return await this.processResearchReport(task);
     }
@@ -675,69 +687,79 @@ class AgentService {
     });
   }
 
-  /* --------------------------- DATA ANALYSIS PIPELINE --------------------------- */
+  /* --------------------------- DATA ANALYSIS DOCX PIPELINE (Orchestrator-driven) --------------------------- */
 
-  private async processDataAnalysis(task: AgentTask) {
-    // DATA_ANALYSIS pipeline: synthetic data, metrics, charts, DOCX report
-    await logger.trace(task.id, "DATA_ANALYSIS pipeline activated");
+  private async processDataAnalysisDOCX(task: AgentTask, normalized: any) {
+    // DATA_ANALYSIS_DOCX pipeline: orchestrator prompts → LLM → structured DOCX
+    await logger.trace(task.id, "DATA_ANALYSIS_DOCX pipeline activated (orchestrator-driven)");
+    await logger.trace(task.id, `Data origin: ${normalized.dataOrigin}`);
     
-    task.currentStep = "Parsing analysis parameters";
-    task.progress = 15;
+    const { students, class_averages } = normalized.data;
+    
+    // O1) BUILD ORCHESTRATOR PROMPTS - no hardcoding
+    task.currentStep = "Building adaptive prompts";
+    task.progress = 20;
     this.updateStatus(task.sessionId, task);
     
-    // A1) INPUT CONTRACT - extract structured data from prompt
-    const params = this.parseAnalysisParams(task.prompt);
-    await logger.trace(task.id, `Parsed: ${params.n_students} students, ${params.skills.length} skills`);
+    const systemPrompt = buildSystemMessage(normalized.intent);
+    const userPrompt = buildUserMessage(normalized.intent, normalized.data);
+    const developerPrompt = buildDeveloperMessage(normalized.intent);
     
-    // A2) SYNTHESIS OF DATA - generate synthetic dataset
-    task.currentStep = "Generating synthetic dataset";
-    task.progress = 30;
+    await logger.trace(task.id, `Orchestrator prompts built (${systemPrompt.length + userPrompt.length + developerPrompt.length} chars total)`);
+    
+    // O2) GENERATE DOCX SECTIONS - LLM produces structured content
+    task.currentStep = "Generating DOCX sections from data";
+    task.progress = 40;
     this.updateStatus(task.sessionId, task);
     
-    const dataset = this.generateSyntheticData(params);
-    await logger.trace(task.id, `Generated ${dataset.length} student records`);
+    const sections = await generateDOCXSections(systemPrompt, userPrompt, developerPrompt);
+    await logger.trace(task.id, `LLM returned ${sections.sections?.length || 0} sections, ${sections.figures?.length || 0} figures, ${sections.tables?.length || 0} tables`);
     
-    // A3) METRICS - compute statistics
-    task.currentStep = "Computing metrics";
-    task.progress = 45;
-    this.updateStatus(task.sessionId, task);
-    
-    const metrics = this.computeMetrics(dataset, params);
-    await logger.trace(task.id, `Computed metrics for ${metrics.length} skills`);
-    
-    // A4) FIGURES - generate charts as PNGs
-    task.currentStep = "Generating charts";
+    // O3) GENERATE CHARTS - from LLM figure specs
+    task.currentStep = "Generating chart images";
     task.progress = 60;
     this.updateStatus(task.sessionId, task);
     
-    const charts = await this.generateAnalysisCharts(task.id, metrics, params);
-    await logger.trace(task.id, `Generated ${charts.length} chart images`);
+    const chartUrls: string[] = [];
+    for (const fig of sections.figures || []) {
+      if (fig.chartSpec) {
+        const chartUrl = `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(fig.chartSpec))}`;
+        chartUrls.push(chartUrl);
+        await logger.trace(task.id, `Chart ${fig.id}: ${chartUrl.slice(0, 80)}...`);
+      }
+    }
     
-    // A5) BUILD DOCX - assemble structured report
-    task.currentStep = "Building analysis report";
+    // O4) BUILD DOCX - from LLM sections (not hardcoded templates)
+    task.currentStep = "Assembling DOCX report";
     task.progress = 75;
     this.updateStatus(task.sessionId, task);
     
-    const docxResult = await this.buildAnalysisDOCX(task.id, params, dataset, metrics, charts);
-    await logger.delivery(task.id, docxResult.filename);
+    const docxFilename = `analysis_report_${task.id}.docx`;
+    const docxResult = await this.buildDOCXFromSections(task.id, docxFilename, sections, chartUrls);
+    await logger.delivery(task.id, docxFilename);
     
-    // A6) DELIVER ARTIFACTS
-    const downloadUrl = fileStorage.getPublicUrl(docxResult.filename);
+    // O5) SAVE CSV - with data_origin metadata
+    const csvFilename = `analysis_data_${task.id}.csv`;
+    const csvPath = await this.saveStudentsCSV(students, csvFilename, normalized.dataOrigin);
+    
+    // O6) DELIVER ARTIFACTS
+    const docxUrl = fileStorage.getPublicUrl(docxFilename);
+    const csvUrl = fileStorage.getPublicUrl(csvFilename);
     
     this.emitArtifact(task.sessionId, {
       id: nanoid(),
-      filename: docxResult.filename,
+      filename: docxFilename,
       fileType: 'docx',
-      fileSize: docxResult.fileSize,
-      downloadUrl,
-      metadata: { type: 'data_analysis', students: params.n_students, skills: params.skills.length },
+      fileSize: docxResult.size,
+      downloadUrl: docxUrl,
+      metadata: {
+        type: 'data_analysis_docx',
+        dataOrigin: normalized.dataOrigin,
+        students: students.length,
+        sections: sections.sections?.length || 0,
+      },
       createdAt: new Date(),
     });
-    
-    // Emit CSV artifact
-    const csvFilename = `analysis_data_${task.id}.csv`;
-    const csvPath = await this.saveDatasetCSV(dataset, csvFilename);
-    const csvUrl = fileStorage.getPublicUrl(csvFilename);
     
     this.emitArtifact(task.sessionId, {
       id: nanoid(),
@@ -745,15 +767,22 @@ class AgentService {
       fileType: 'csv',
       fileSize: csvPath.size,
       downloadUrl: csvUrl,
-      metadata: { type: 'analysis_data' },
+      metadata: {
+        type: 'analysis_data',
+        dataOrigin: normalized.dataOrigin,
+      },
       createdAt: new Date(),
     });
     
     // Success message
+    const dataOriginNote = normalized.dataOrigin === 'synthetic-from-prompt'
+      ? ` (${students.length} synthetic students generated from prompt)`
+      : ` (${students.length} students)`;
+    
     this.emitMessage(task.sessionId, {
       id: nanoid(),
       role: "assistant",
-      content: `✅ Analysis complete! Generated DOCX report with ${charts.length} embedded charts, metrics table, and ${dataset.length}-row synthetic dataset (CSV). Check the "Generated Artifacts" panel.`,
+      content: `✅ Analysis complete! Generated DOCX report with ${sections.figures?.length || 0} embedded charts, ${sections.tables?.length || 0} tables${dataOriginNote}, and CSV dataset. Check the "Generated Artifacts" panel.`,
       timestamp: new Date(),
       status: "completed",
     });
