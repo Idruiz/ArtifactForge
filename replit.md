@@ -10,6 +10,35 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (October 2025)
 
+### Critical Fixes (October 3, 2025)
+
+#### Static Website Routing - PRODUCTION READY
+- ✅ **Dedicated Express Router**: Synchronous router setup before async operations prevents Vite interception
+- ✅ **Route Pattern**: `/sites/:id` and `/sites/:id/*` serve static files from `data/sites/<id>/`
+- ✅ **express.static middleware**: Extensions: ['html'], index: 'index.html', no-store caching
+- ✅ **Security**: ID validation regex, path traversal prevention
+- ✅ **Logging**: All static file requests logged for debugging
+- ✅ **Tested**: `curl http://localhost:5000/sites/test123/` returns actual HTML (not React app)
+
+#### DOCX Report Generation - COMPREHENSIVE OVERHAUL
+- ✅ **New buildDOCXReport() function**: Dedicated structured report builder (builder.ts lines 2308-2569)
+- ✅ **Source Filtering**: Blacklist weak domains (scribd, geeksforgeeks, calculator sites, Microsoft Create templates)
+- ✅ **Anti-Leakage**: Strips meta language ("this slide", "presentation") and rewrites future tense ("will be" → "is")
+- ✅ **Proper Structure**: Cover → Executive Summary → Introduction → Methods → Results → Discussion → References
+- ✅ **Chart Embedding**: Downloads PNGs from QuickChart, validates size, adds figure captions, fallback text on failure
+- ✅ **Detection Logic**: Checks title AND content for report keywords (method, result, analysis, data, findings, etc.)
+- ✅ **Acceptance Guards**: Validates minimum content length (500 chars), logs chart/reference counts, adds quality notes for data analysis
+- ✅ **Removed**: Notes field no longer appears in DOCX output (was leaking internal scaffolding)
+
+#### Data Analysis Pipeline - DEEP ANALYSIS ENFORCEMENT  
+- ✅ **Enhanced generateRichOutline Prompt** (openai.ts lines 139-169):
+  - **CRITICAL RULES**: Analyze & infer, compute metrics, synthesize sources, reason (not copy-paste)
+  - **FORBIDDEN**: Meta language, placeholders ("TBD"), future tense for content, empty analysis
+  - **DATA & CHARTS**: Compute percentages/rates/comparisons from research, no fabrication but DO calculate
+  - **QUALITY CHECKS**: 700+ char bodies, unique specific titles, concrete bullets, relevant keywords
+- ✅ **Explicit Instructions**: "Extract insights, patterns, implications" instead of passive "use research context"
+- ✅ **Validation**: Body must contain actual reasoning, not generic statements
+
 ### Major UI Overhaul - Three-Panel Layout
 - ✅ **Replaced tab system** with three-panel ResizablePanelGroup layout
 - ✅ **Left Panel (15%)**: Quick Actions for common content types
