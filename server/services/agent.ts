@@ -15,7 +15,7 @@ import { fileStorage } from "../utils/fileStorage";
 
 // ─── SOURCE VETTING (Allowlist + Scoring) ───
 
-// Allowlist patterns (accept by default)
+// Allowlist patterns (accept by default - generic, works for ANY topic)
 const ALLOWLIST_PATTERNS = [
   // Core Academic
   '.edu', '.ac.', '.gov', 
@@ -23,8 +23,6 @@ const ALLOWLIST_PATTERNS = [
   '.museum', '.nhm.', 'amnh.org', 'smithsonian', 'biodiversitylibrary.org',
   // Peer-reviewed aggregators
   'ncbi.nlm.nih.gov/pmc', 'doi.org/',
-  // Biology-specific
-  'antwiki.org', 'antweb.org', 
   // University extensions & research
   'ufl.edu/ifas', 'ucdavis.edu/ipm', 'nhm.ac.uk', 'nmnh.si.edu',
   // Fallback encyclopedias
@@ -38,31 +36,6 @@ const BLOCKLIST_PATTERNS = [
   'studocu.com', 'scribd.com', 'misfitanimals.com', 'geeksforgeeks.org',
   'calculator', 'microsoft.com/create', 'galaxy.ai', 'chegg.com', 'coursehero.com',
   'quizlet.com', 'slideshare.net', 'prezi.com', 'rapidtables.com',
-];
-
-// Known reference seeds (preloaded fallbacks)
-const SEED_REFERENCES = [
-  { 
-    title: "The Ants", 
-    authors: "Hölldobler, B. & Wilson, E.O.", 
-    year: 1990,
-    citation: "Hölldobler, B. & Wilson, E.O. (1990). The Ants. Harvard University Press.",
-    url: "https://doi.org/10.1007/978-3-662-10306-7" 
-  },
-  {
-    title: "Ant Ecology",
-    authors: "Lach, L., Parr, C.L. & Abbott, K.L.",
-    year: 2010,
-    citation: "Lach, L., Parr, C.L. & Abbott, K.L. (2010). Ant Ecology. Oxford University Press.",
-    url: "https://global.oup.com/academic/product/ant-ecology-9780199544639"
-  },
-  {
-    title: "The Fire Ants",
-    authors: "Tschinkel, W.R.",
-    year: 2006,
-    citation: "Tschinkel, W.R. (2006). The Fire Ants. Harvard University Press.",
-    url: "https://www.hup.harvard.edu/catalog.php?isbn=9780674022075"
-  },
 ];
 
 // URL normalizer: dedupe, canonicalize, unwrap
@@ -107,22 +80,18 @@ function scoreSource(url: string, title: string = '', snippet: string = ''): num
     return 0;
   }
   
-  // Authority scoring
+  // Authority scoring (generic, works for ANY topic)
   if (lower.includes('.edu')) score += 0.4;
   if (lower.includes('.gov')) score += 0.4;
   if (lower.includes('.ac.')) score += 0.35;
   if (lower.includes('museum') || lower.includes('nhm.') || lower.includes('amnh.org')) score += 0.3;
   if (lower.includes('doi.org') || lower.includes('ncbi.nlm.nih.gov')) score += 0.5;
-  if (lower.includes('antwiki') || lower.includes('antweb')) score += 0.35;
   if (lower.includes('britannica.com')) score += 0.4;
   if (lower.includes('wikipedia.org')) score += 0.3;
   if (lower.includes('nationalgeographic.com')) score += 0.4;
   if (lower.includes('scientificamerican.com')) score += 0.4;
   if (lower.includes('nature.com')) score += 0.5;
   if (lower.includes('smithsonian')) score += 0.4;
-  
-  // Topic match bonus (for biology/ants)
-  if (text.match(/\b(ant|formicidae|insect|metamorphosis|larva|pupa|colony)\b/i)) score += 0.15;
   
   // PDF bonus (often research papers)
   if (lower.endsWith('.pdf')) score += 0.1;
@@ -464,31 +433,31 @@ class AgentService {
       
       // R1-R5: Loop multiple times with variations until we hit MIN_VETTED_REQUIRED or MAX_ROUNDS
       const queryVariations = [
-        // R1: Topical/scientific
+        // R1: Topical/scientific (uses generateFallbackQueries - already generic)
         () => this.generateFallbackQueries(task.prompt),
-        // R2: Scholar-specific
+        // R2: Scholar-specific (generic scholarly databases)
         () => [
           `${task.prompt} site:ncbi.nlm.nih.gov/pmc`,
           `${task.prompt} site:doi.org`,
-          `${task.prompt} site:antwiki.org OR site:antweb.org`,
+          `${task.prompt} site:biodiversitylibrary.org OR site:archive.org`,
           `${task.prompt} site:smithsonian OR site:nhm.ac.uk OR site:amnh.org`,
         ],
-        // R3: Extension/edu
+        // R3: Extension/edu (generic academic extensions)
         () => [
-          `${task.prompt} site:edu extension OR ipm`,
-          `${task.prompt} site:gov agriculture OR entomology`,
+          `${task.prompt} site:edu research OR study`,
+          `${task.prompt} site:gov publications OR reports`,
         ],
-        // R4: Synonyms
+        // R4: Synonyms (generic research terms, works for ANY topic)
         () => [
-          task.prompt.replace(/life cycle/i, 'development stages'),
-          task.prompt.replace(/life cycle/i, 'ontogeny metamorphosis'),
-          task.prompt + ' brood development caste differentiation',
+          task.prompt.replace(/life cycle/i, 'development'),
+          task.prompt.replace(/history of/i, 'evolution of'),
+          `${task.prompt} comprehensive review`,
         ],
-        // R5: Broader synonyms
+        // R5: Broader (generic broadening terms)
         () => [
-          task.prompt + ' biology ecology behavior',
-          task.prompt.replace(/life cycle/i, 'reproduction breeding'),
-          task.prompt + ' developmental biology insect',
+          `${task.prompt} research findings`,
+          `${task.prompt} scientific literature`,
+          `${task.prompt} scholarly analysis`,
         ],
       ];
       

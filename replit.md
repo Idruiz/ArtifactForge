@@ -62,22 +62,44 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (October 3, 2025)
 
+### PIPELINE SEPARATION: DATA_ANALYSIS vs RESEARCH_REPORT
+**Problem**: Different job types (data analysis vs research reports) were using the same template path
+**Solution**: Intent router detects pipeline type and routes to appropriate specialized pipeline
+
+**Intent Router**:
+- **DATA_ANALYSIS**: Triggered by metrics, counts, thresholds, numeric patterns ("20 students, 5 below 60")
+- **RESEARCH_REPORT**: Triggered by topic-based queries ("life cycle of", "history of", "what is")
+- Routes to completely separate execution paths with different validation requirements
+
+**DATA_ANALYSIS Pipeline**:
+1. Parse analysis parameters (n_students, skills with thresholds)
+2. Generate synthetic dataset with constrained randomization
+3. Compute metrics (mean, median, p25/p75, stdev, rates)
+4. Generate charts (bar charts for counts and rates)
+5. Build structured DOCX with Executive Summary, Methods, Results sections
+6. Deliver: DOCX report + CSV dataset + chart PNGs
+
+**RESEARCH_REPORT Pipeline**:
+- Unchanged - uses existing research flow with 10+ source requirement
+- Web research → Source vetting → Outline → Visual matching → DOCX/PPTX build
+
 ### CRITICAL OVERHAUL: R0-R5 Iterative Source Harvest System
 **Problem**: System searched generic queries then rejected 90% of results
 **Solution**: TARGET QUALITY SOURCES FROM THE START + R0-R5 iterative harvest to reach 10 sources
 
 **Initial Query Strategy (FIXED)**:
-- **Scientific topics**: Directly target site:edu, site:gov, site:ncbi.nlm.nih.gov, site:doi.org, museums
-- **Generic topics**: Prioritize site:edu OR site:gov, then research/analysis queries
-- **No more**: "life cycle of ants 2025 trends" or "best practices" nonsense
+- **ALL topics**: ALWAYS target site:edu, site:gov, site:ac.uk first (not just scientific)
+- **Academic topics**: Add site:doi.org, site:ncbi.nlm.nih.gov for scholarly databases
+- **Generic topics**: Add research/study/analysis keywords
+- **Removed**: Hardcoded ant/insect checks - now works for ANY topic
 
-**R0-R5 Harvest Rounds (Keep searching until ≥10 sources)**:
-- **R0 Seeds**: Add topic-relevant references (Hölldobler & Wilson, Lach et al, Tschinkel)
-- **R1 Topical**: Broaden with scientific terms (Formicidae, holometabolous, etc.)
-- **R2 Scholar**: site:ncbi.nlm.nih.gov/pmc, site:doi.org, antwiki, museums
-- **R3 Extension**: site:edu extension/IPM, site:gov agriculture/entomology
-- **R4 Synonyms**: development stages, ontogeny, metamorphosis, brood development
-- **R5 Broader**: biology ecology behavior, reproduction breeding
+**R1-R5 Harvest Rounds (Keep searching until ≥10 sources)**:
+- **R0 Seeds**: REMOVED (was hardcoded for ants only)
+- **R1 Topical**: Generic fallback (site:edu, site:gov, scientific review, PDF)
+- **R2 Scholar**: site:ncbi.nlm.nih.gov/pmc, site:doi.org, biodiversitylibrary.org, museums
+- **R3 Extension**: site:edu research/study, site:gov publications/reports
+- **R4 Synonyms**: Generic replacements (life cycle→development, history of→evolution of)
+- **R5 Broader**: research findings, scientific literature, scholarly analysis
 - **STOP**: When vetted_count ≥10, proceed to outline. Otherwise continue up to MAX_ROUNDS (10).
 
 **Iterative Loop (MAX_ROUNDS = 10)**:
