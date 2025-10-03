@@ -12,6 +12,20 @@ Preferred communication style: Simple, everyday language.
 
 ### Critical Fixes (October 3, 2025)
 
+#### DOCX Report Pipeline - COMPLETE REWRITE ✅ NEW
+- **6-Stage Validation Pipeline**: Parse → Enrich → Fetch Charts → Validate → Assemble → Pack
+  - Stage 1: Parse & Sanitize (remove meta language, fix tense)
+  - Stage 2: Enrich with Citations & Tables (convert [Source1] to superscript refs, extract numeric data)
+  - Stage 3: Fetch Charts (robust PNG download with validation, error logging)
+  - Stage 4: Validate (forbidden terms, truncation, minimum citations, chart/table requirements)
+  - Stage 5: Assemble DOCX (proper structure with citations, tables, charts)
+  - Stage 6: Pack & Export (error-wrapped Packer.toBuffer)
+- **Citation Mapping**: [Source1] tags → superscript [1] references linked to bibliography
+- **Table Generation**: Extracts numeric bullets (e.g., "Stage duration: 3 weeks") → formatted tables
+- **Robust Chart Embedding**: Validates HTTP 200, buffer size >100 bytes, fails gracefully
+- **Fail-Fast Validation**: Checks forbidden terms, truncation (ellipses), min 3 citations, min 3 sources, chart/table for data analysis
+- **Source Vetting (Stage 1 in Agent)**: Whitelist .edu/.gov/peer-reviewed, blacklist junk, min 3 vetted sources for reports
+
 #### Static Website Routing - PRODUCTION READY
 - ✅ **Dedicated Express Router**: Synchronous router setup before async operations prevents Vite interception
 - ✅ **Route Pattern**: `/sites/:id` and `/sites/:id/*` serve static files from `data/sites/<id>/`
