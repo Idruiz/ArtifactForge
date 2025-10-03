@@ -96,11 +96,11 @@ export class RequestNormalizer {
       );
     }
     
-    const students = this.generateSyntheticStudents(n_students, skills, overall_avg);
-    
-    const class_averages = this.computeClassAverages(students);
-    
-    return { students, class_averages };
+    return {
+      students: [],
+      class_averages: undefined,
+      _params: { n_students, skills, overall_avg }
+    } as any;
   }
   
   private generateSyntheticStudents(count: number, skills: Array<{ skill: string; below: number; cut: number }>, overall_avg: number): any[] {

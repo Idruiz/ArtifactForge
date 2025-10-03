@@ -694,7 +694,22 @@ class AgentService {
     await logger.trace(task.id, "DATA_ANALYSIS_DOCX pipeline activated (orchestrator-driven)");
     await logger.trace(task.id, `Data origin: ${normalized.dataOrigin}`);
     
-    const { students, class_averages } = normalized.data;
+    let { students, class_averages } = normalized.data;
+    
+    // If no students provided (text prompt), generate synthetic data
+    if (!students || students.length === 0) {
+      const params = (normalized.data as any)._params;
+      if (params) {
+        await logger.trace(task.id, `Generating synthetic students: count=${params.n_students}, skills=${params.skills.length}`);
+        students = this.generateSyntheticStudentsFromParams(params);
+        class_averages = this.computeClassAveragesFromStudents(students);
+        normalized.data = { students, class_averages };
+      } else {
+        throw new Error("No students data or parameters provided");
+      }
+    } else {
+      await logger.trace(task.id, `Using provided students: count=${students.length}`);
+    }
     
     // O1) BUILD ORCHESTRATOR PROMPTS - no hardcoding
     task.currentStep = "Building adaptive prompts";
@@ -1024,6 +1039,79 @@ class AgentService {
     await fileStorage.saveFile(filename, buffer);
     
     return { size: buffer.length };
+  }
+
+  // Helper: Generate synthetic students from parameters (orchestrator)
+  private generateSyntheticStudentsFromParams(params: any): any[] {
+    const { n_students, skills, overall_avg } = params;
+    const seed = Date.now();
+    let rngState = seed;
+    const random = () => {
+      rngState = (rngState * 1103515245 + 12345) & 0x7fffffff;
+      return rngState / 0x7fffffff;
+    };
+    
+    const students: any[] = [];
+    const firstNames = ['Ava', 'Liam', 'Sofia', 'Noah', 'Maya', 'Ethan', 'Mia', 'Lucas', 'Emma', 'Oliver'];
+    const lastInitials = ['R.', 'T.', 'M.', 'P.', 'C.', 'K.', 'L.', 'S.', 'W.', 'H.'];
+    
+    for (let i = 0; i < n_students; i++) {
+      const name = `${firstNames[i % firstNames.length]} ${lastInitials[i % lastInitials.length]}`;
+      const student: any = { name };
+      
+      for (const { skill, below, cut } of skills) {
+        const shouldBeBelow = i < below;
+        if (shouldBeBelow) {
+          student[`${skill}_pct`] = Math.floor(30 + random() * (cut - 30));
+        } else {
+          student[`${skill}_pct`] = Math.floor(cut + random() * (100 - cut));
+        }
+      }
+      
+      const avgScore = skills.length > 0
+        ? skills.reduce((sum: number, { skill }: any) => sum + (student[`${skill}_pct`] || overall_avg), 0) / skills.length
+        : overall_avg;
+      
+      student.test_pct = Math.floor(avgScore + (random() - 0.5) * 10);
+      student.term_pct = Math.floor(avgScore + (random() - 0.5) * 10);
+      student.attendance_pct = Math.floor(85 + random() * 15);
+      student.missing_tasks = Math.floor(random() * 6);
+      student.engagement_5 = Math.floor(1 + random() * 5);
+      student.growth_pct = Math.floor(-5 + random() * 15);
+      student.notes = this.generateStudentNotes(student);
+      
+      students.push(student);
+    }
+    
+    return students;
+  }
+
+  // Helper: Compute class averages from students (orchestrator)
+  private computeClassAveragesFromStudents(students: any[]): any {
+    if (students.length === 0) return {};
+    
+    const sum = (key: string) => students.reduce((s, st) => s + (st[key] || 0), 0);
+    
+    return {
+      test_pct: Math.round((sum('test_pct') / students.length) * 10) / 10,
+      term_pct: Math.round((sum('term_pct') / students.length) * 10) / 10,
+      attendance_pct: Math.round((sum('attendance_pct') / students.length) * 10) / 10,
+      missing_tasks_per_student: Math.round((sum('missing_tasks') / students.length) * 10) / 10,
+      engagement_mean_5: Math.round((sum('engagement_5') / students.length) * 10) / 10,
+    };
+  }
+
+  // Helper: Generate notes for a student
+  private generateStudentNotes(student: any): string {
+    const notes = [];
+    if (student.test_pct >= 90) notes.push('strong performer');
+    if (student.test_pct < 70) notes.push('needs support');
+    if (student.attendance_pct < 90) notes.push('attendance concern');
+    if (student.missing_tasks > 3) notes.push('missing assignments');
+    if (student.engagement_5 >= 4) notes.push('highly engaged');
+    if (student.engagement_5 <= 2) notes.push('low engagement');
+    
+    return notes.join('; ') || 'on track';
   }
 
   // Helper: Build DOCX from LLM-generated sections (orchestrator)
