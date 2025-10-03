@@ -81,11 +81,11 @@ function normalizeURL(url: string): string {
     const params = new URLSearchParams(urlObj.search);
     const cleanParams = new URLSearchParams();
     
-    for (const [key, value] of params) {
+    params.forEach((value, key) => {
       if (!key.startsWith('utm_') && !key.startsWith('fb') && key !== 'ref') {
         cleanParams.set(key, value);
       }
-    }
+    });
     
     urlObj.search = cleanParams.toString();
     normalized = urlObj.toString();
