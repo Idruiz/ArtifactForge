@@ -731,25 +731,26 @@ class AgentService {
 
   private async generateSearchQueries(prompt: string): Promise<string[]> {
     const base = (prompt || "").trim();
-    const isScientific = /\b(life cycle|biology|species|ecology|anatomy|physiology|development|metamorphosis|scientific|research)\b/i.test(base);
     
-    if (isScientific) {
-      // Target scholarly sources directly for scientific topics
-      return [
-        `${base} site:edu OR site:gov OR site:ac.uk`,
-        `${base} site:ncbi.nlm.nih.gov OR site:doi.org`,
-        `${base} PDF site:edu`,
-        `${base} site:smithsonian OR site:amnh.org OR site:biodiversitylibrary.org`,
-      ];
+    // Detect academic/research intent (generic pattern for ANY scholarly topic)
+    const isAcademic = /\b(life cycle|biology|species|ecology|anatomy|physiology|development|metamorphosis|scientific|research|study|history of|comparative|analysis of|what is|how does|theory|evolution|chemistry|physics|psychology|sociology|economics|literature|philosophy|mathematics|engineering|medicine|law|political science|anthropology)\b/i.test(base);
+    
+    // ALWAYS target quality sources first for ANY topic
+    const queries = [
+      `${base} site:edu OR site:gov OR site:ac.uk`,  // Academic institutions
+      `${base}`,  // Plain search as fallback
+      `${base} research OR study OR analysis`,  // Research-oriented
+    ];
+    
+    // Add specialized academic databases for scholarly topics
+    if (isAcademic) {
+      queries.push(`${base} PDF site:doi.org OR site:ncbi.nlm.nih.gov`);
+    } else {
+      // For non-academic topics, still prefer authoritative sources
+      queries.push(`${base} site:gov OR site:org`);
     }
     
-    // For non-scientific topics, still prefer quality sources
-    return [
-      `${base} site:edu OR site:gov`,
-      `${base}`,
-      `${base} analysis research`,
-      `${base} statistics data`,
-    ];
+    return queries.slice(0, 4);
   }
 
   private broadenQueries(prompt: string, prev: string[]): string[] {
