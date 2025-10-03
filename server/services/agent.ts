@@ -340,6 +340,7 @@ class AgentService {
     const vettedUrls: string[] = [];
     const rejectedUrls: string[] = [];
     
+    // Process each search result and vet
     for (const [query, response] of Object.entries(searchResults)) {
       const results = Array.isArray(response?.results) ? response.results : [];
       const vetted = results.filter((r: any) => {
@@ -352,13 +353,25 @@ class AgentService {
         
         const title = r?.title || '';
         const snippet = r?.snippet || '';
+        const lower = url.toLowerCase();
+        
+        // Check each vetting tier and log results
+        const blocklisted = BLOCKLIST_PATTERNS.some(pattern => lower.includes(pattern));
+        const allowlisted = ALLOWLIST_PATTERNS.some(pattern => lower.includes(pattern));
+        const score = scoreSource(url, title, snippet);
         const isVetted = isVettedSource(url, title, snippet);
+        
+        // Build decision explanation
+        let decision = '';
+        if (blocklisted) decision = 'BLOCKLIST';
+        else if (allowlisted) decision = 'ALLOWLIST→PASS';
+        else if (score >= 0.3) decision = `SCORE ${score.toFixed(2)}→PASS`;
+        else decision = `SCORE ${score.toFixed(2)}→FAIL`;
         
         if (isVetted) {
           vettedUrls.push(url);
         } else {
-          const score = scoreSource(url, title, snippet);
-          rejectedUrls.push(`${url} (score: ${score.toFixed(2)})`);
+          rejectedUrls.push(`${url.slice(0, 60)} [${decision}]`);
         }
         
         return isVetted;
@@ -375,8 +388,8 @@ class AgentService {
     if (vettedCount > 0) {
       await logger.trace(task.id, `✓ Vetted: ${vettedUrls.slice(0, 3).map(u => u.slice(0, 50)).join(', ')}${vettedCount > 3 ? ` +${vettedCount - 3} more` : ''}`);
     }
-    if (rejectedCount > 0 && rejectedCount <= 10) {
-      await logger.trace(task.id, `✗ Rejected: ${rejectedUrls.slice(0, 5).join(' | ')}`);
+    if (rejectedCount > 0) {
+      await logger.trace(task.id, `✗ Rejected (showing first 5): ${rejectedUrls.slice(0, 5).join(' | ')}`);
     }
     
     // Multi-stage fallbacks if insufficient sources
