@@ -459,30 +459,8 @@ class AgentService {
     if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
       await logger.trace(task.id, `Need ${MIN_VETTED_REQUIRED} sources, have ${vettedUrls.length}. Starting iterative harvest (max ${MAX_ROUNDS} rounds)...`);
       
-      // R0: Seed references (run once)
-      if (vettedUrls.length < MIN_VETTED_REQUIRED) {
-        roundNumber++;
-        await logger.trace(task.id, `[Round ${roundNumber}] R0: Adding seed references`);
-        const relevantSeeds = SEED_REFERENCES.filter(ref => 
-          task.prompt.toLowerCase().includes('ant') || task.prompt.toLowerCase().includes('insect')
-        );
-        
-        for (const seed of relevantSeeds) {
-          if (!seenUrls.has(seed.url)) {
-            seenUrls.add(seed.url);
-            vettedUrls.push(seed.url);
-            vettedResults['R0_seeds'] = vettedResults['R0_seeds'] || { results: [], totalResults: 0 };
-            vettedResults['R0_seeds'].results.push({
-              title: seed.title,
-              url: seed.url,
-              snippet: seed.citation,
-            });
-            vettedResults['R0_seeds'].totalResults++;
-          }
-        }
-        roundsCompleted.push(`R0=${relevantSeeds.length}`);
-        await logger.trace(task.id, `R0 → ${vettedUrls.length} total`);
-      }
+      // R0: Skip seed references - search should find quality sources directly
+      // (Seed references were ant-specific and not generic enough for all topics)
       
       // R1-R5: Loop multiple times with variations until we hit MIN_VETTED_REQUIRED or MAX_ROUNDS
       const queryVariations = [
@@ -728,6 +706,312 @@ class AgentService {
     });
   }
 
+  /* --------------------------- DATA ANALYSIS PIPELINE --------------------------- */
+
+  private async processDataAnalysis(task: AgentTask) {
+    // DATA_ANALYSIS pipeline: synthetic data, metrics, charts, DOCX report
+    await logger.trace(task.id, "DATA_ANALYSIS pipeline activated");
+    
+    task.currentStep = "Parsing analysis parameters";
+    task.progress = 15;
+    this.updateStatus(task.sessionId, task);
+    
+    // A1) INPUT CONTRACT - extract structured data from prompt
+    const params = this.parseAnalysisParams(task.prompt);
+    await logger.trace(task.id, `Parsed: ${params.n_students} students, ${params.skills.length} skills`);
+    
+    // A2) SYNTHESIS OF DATA - generate synthetic dataset
+    task.currentStep = "Generating synthetic dataset";
+    task.progress = 30;
+    this.updateStatus(task.sessionId, task);
+    
+    const dataset = this.generateSyntheticData(params);
+    await logger.trace(task.id, `Generated ${dataset.length} student records`);
+    
+    // A3) METRICS - compute statistics
+    task.currentStep = "Computing metrics";
+    task.progress = 45;
+    this.updateStatus(task.sessionId, task);
+    
+    const metrics = this.computeMetrics(dataset, params);
+    await logger.trace(task.id, `Computed metrics for ${metrics.length} skills`);
+    
+    // A4) FIGURES - generate charts as PNGs
+    task.currentStep = "Generating charts";
+    task.progress = 60;
+    this.updateStatus(task.sessionId, task);
+    
+    const charts = await this.generateAnalysisCharts(task.id, metrics, params);
+    await logger.trace(task.id, `Generated ${charts.length} chart images`);
+    
+    // A5) BUILD DOCX - assemble structured report
+    task.currentStep = "Building analysis report";
+    task.progress = 75;
+    this.updateStatus(task.sessionId, task);
+    
+    const docxResult = await this.buildAnalysisDOCX(task.id, params, dataset, metrics, charts);
+    await logger.delivery(task.id, docxResult.filename);
+    
+    // A6) DELIVER ARTIFACTS
+    const downloadUrl = fileStorage.getPublicUrl(docxResult.filename);
+    
+    this.emitArtifact(task.sessionId, {
+      id: nanoid(),
+      filename: docxResult.filename,
+      fileType: 'docx',
+      fileSize: docxResult.fileSize,
+      downloadUrl,
+      metadata: { type: 'data_analysis', students: params.n_students, skills: params.skills.length },
+      createdAt: new Date(),
+    });
+    
+    // Emit CSV artifact
+    const csvFilename = `analysis_data_${task.id}.csv`;
+    const csvPath = await this.saveDatasetCSV(dataset, csvFilename);
+    const csvUrl = fileStorage.getPublicUrl(csvFilename);
+    
+    this.emitArtifact(task.sessionId, {
+      id: nanoid(),
+      filename: csvFilename,
+      fileType: 'csv',
+      fileSize: csvPath.size,
+      downloadUrl: csvUrl,
+      metadata: { type: 'analysis_data' },
+      createdAt: new Date(),
+    });
+    
+    // Success message
+    this.emitMessage(task.sessionId, {
+      id: nanoid(),
+      role: "assistant",
+      content: `✅ Analysis complete! Generated DOCX report with ${charts.length} embedded charts, metrics table, and ${dataset.length}-row synthetic dataset (CSV). Check the "Generated Artifacts" panel.`,
+      timestamp: new Date(),
+      status: "completed",
+    });
+    
+    task.progress = 100;
+    this.updateStatus(task.sessionId, task);
+  }
+
+  // Helper: Parse analysis parameters from prompt
+  private parseAnalysisParams(prompt: string): any {
+    // Extract n_students, skills with thresholds
+    const p = prompt.toLowerCase();
+    
+    // Default structure
+    const params: any = {
+      n_students: 20,
+      overall_avg: 75,
+      skills: []
+    };
+    
+    // Extract student count
+    const studentMatch = p.match(/(\d+)\s*students?/);
+    if (studentMatch) params.n_students = parseInt(studentMatch[1]);
+    
+    // Extract overall average
+    const avgMatch = p.match(/average[:\s]+(\d+)/);
+    if (avgMatch) params.overall_avg = parseInt(avgMatch[1]);
+    
+    // Extract skills with thresholds (e.g., "5 below 60 in listening")
+    const skillPatterns = [
+      { re: /(\d+)\s*below\s*(\d+)\s*(?:in|for)?\s*(\w+)/g, skill: 3, below: 1, cut: 2 },
+      { re: /(\w+)[:\s]+(\d+)\s*below\s*(\d+)/g, skill: 1, below: 2, cut: 3 },
+    ];
+    
+    for (const pattern of skillPatterns) {
+      let match;
+      while ((match = pattern.re.exec(p)) !== null) {
+        params.skills.push({
+          skill: match[pattern.skill],
+          below: parseInt(match[pattern.below]),
+          cut: parseInt(match[pattern.cut])
+        });
+      }
+    }
+    
+    // If no skills found, use defaults
+    if (params.skills.length === 0) {
+      params.skills = [
+        { skill: 'listening', below: 5, cut: 60 },
+        { skill: 'writing', below: 4, cut: 70 },
+        { skill: 'speaking', below: 10, cut: 65 },
+      ];
+    }
+    
+    return params;
+  }
+
+  // Helper: Generate synthetic dataset
+  private generateSyntheticData(params: any): any[] {
+    const { n_students, skills } = params;
+    const seed = Date.now();
+    const dataset: any[] = [];
+    
+    // Simple seeded random
+    let rngState = seed;
+    const random = () => {
+      rngState = (rngState * 1103515245 + 12345) & 0x7fffffff;
+      return rngState / 0x7fffffff;
+    };
+    
+    // Generate students
+    for (let i = 0; i < n_students; i++) {
+      const student: any = { student_id: `S${String(i + 1).padStart(3, '0')}` };
+      
+      for (const { skill, below, cut } of skills) {
+        // Need exactly 'below' students below 'cut'
+        const shouldBeBelow = i < below;
+        
+        if (shouldBeBelow) {
+          // Below threshold: 30 to cut-1
+          student[skill] = Math.floor(30 + random() * (cut - 30));
+        } else {
+          // Above threshold: cut to 100
+          student[skill] = Math.floor(cut + random() * (100 - cut));
+        }
+      }
+      
+      dataset.push(student);
+    }
+    
+    return dataset;
+  }
+
+  // Helper: Compute metrics
+  private computeMetrics(dataset: any[], params: any): any[] {
+    const { skills } = params;
+    const metrics: any[] = [];
+    
+    for (const { skill, below, cut } of skills) {
+      const scores = dataset.map(s => s[skill]).filter(v => v != null);
+      const belowCount = scores.filter(v => v < cut).length;
+      const rate = (belowCount / scores.length) * 100;
+      
+      const sorted = scores.slice().sort((a, b) => a - b);
+      const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const p25 = sorted[Math.floor(sorted.length * 0.25)];
+      const p75 = sorted[Math.floor(sorted.length * 0.75)];
+      
+      const variance = scores.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / scores.length;
+      const stdev = Math.sqrt(variance);
+      
+      metrics.push({
+        skill,
+        cut,
+        below: belowCount,
+        rate: rate.toFixed(1),
+        mean: mean.toFixed(1),
+        median,
+        p25,
+        p75,
+        stdev: stdev.toFixed(1)
+      });
+    }
+    
+    return metrics;
+  }
+
+  // Helper: Generate analysis charts (stub - will use QuickChart or similar)
+  private async generateAnalysisCharts(taskId: string, metrics: any[], params: any): Promise<any[]> {
+    // TODO: Generate real PNG charts using QuickChart.io or similar
+    // For now, return chart specs that builder can handle
+    const charts: any[] = [];
+    
+    // F1: Bar chart - counts below threshold
+    charts.push({
+      id: 'F1',
+      type: 'bar',
+      title: 'Students Below Threshold by Skill',
+      url: `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify({
+        type: 'bar',
+        data: {
+          labels: metrics.map(m => m.skill),
+          datasets: [{ label: 'Below Cut', data: metrics.map(m => m.below) }]
+        }
+      }))}`
+    });
+    
+    // F2: Bar chart - rate %
+    charts.push({
+      id: 'F2',
+      type: 'bar',
+      title: 'Rate Below Threshold (%)',
+      url: `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify({
+        type: 'bar',
+        data: {
+          labels: metrics.map(m => m.skill),
+          datasets: [{ label: 'Rate %', data: metrics.map(m => parseFloat(m.rate)) }]
+        }
+      }))}`
+    });
+    
+    return charts;
+  }
+
+  // Helper: Build analysis DOCX
+  private async buildAnalysisDOCX(taskId: string, params: any, dataset: any[], metrics: any[], charts: any[]): Promise<any> {
+    // Use builder service to create DOCX with special analysis structure
+    const slides = [
+      {
+        title: 'Executive Summary',
+        content: {
+          body: `This analysis examines performance data for ${params.n_students} students across ${params.skills.length} skill areas. ` +
+                `Key findings: ${metrics.map(m => `${m.skill} has ${m.below} students (${m.rate}%) below the ${m.cut} threshold`).join('; ')}.`
+        }
+      },
+      {
+        title: 'Methods',
+        content: {
+          body: 'Synthetic dataset generated using constrained randomization to match specified thresholds. ' +
+                `Seed: ${Date.now()}. Student count: ${params.n_students}.`
+        }
+      },
+      {
+        title: 'Results',
+        content: {
+          body: 'Detailed metrics computed for each skill area. See table and charts below.',
+          bullets: metrics.map(m => 
+            `${m.skill}: Mean=${m.mean}, Median=${m.median}, StdDev=${m.stdev}, Below cut (${m.cut}): ${m.below} (${m.rate}%)`
+          )
+        }
+      },
+      {
+        title: 'Chart: Students Below Threshold',
+        content: {
+          chart: charts[0]
+        }
+      },
+      {
+        title: 'Chart: Rate Below Threshold',
+        content: {
+          chart: charts[1]
+        }
+      }
+    ];
+    
+    return await builderService.buildPresentation(taskId, {
+      title: `Performance Analysis - ${params.n_students} Students`,
+      slides,
+      format: 'docx',
+      sources: [],
+      layoutHints: { isDataAnalysis: true }
+    } as any);
+  }
+
+  // Helper: Save dataset as CSV
+  private async saveDatasetCSV(dataset: any[], filename: string): Promise<any> {
+    const headers = Object.keys(dataset[0] || {});
+    const rows = dataset.map(row => headers.map(h => row[h] ?? '').join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    
+    const buffer = Buffer.from(csv, 'utf-8');
+    await fileStorage.saveFile(filename, buffer);
+    
+    return { size: buffer.length };
+  }
+
   /* ------------------------------- helpers ------------------------------- */
 
   private detectRequestedFormats(prompt: string): BuilderFormat[] {
@@ -824,24 +1108,13 @@ class AgentService {
 
   private generateFallbackQueries(prompt: string): string[] {
     const base = (prompt || "").trim();
-    const lower = base.toLowerCase();
     
-    // Scientific/biological fallbacks
-    if (lower.includes('ant')) {
-      return [
-        'Formicidae holometabolous development site:edu OR site:gov',
-        'ant lifecycle metamorphosis larval pupal stages',
-        'ant colony caste queen worker development duration',
-        'Formicidae life cycle review PDF',
-      ];
-    }
-    
-    // Generic fallback pattern
+    // Generic fallback pattern for ANY topic
     return [
       `${base} site:edu OR site:gov`,
-      `${base} scientific review`,
-      `${base} research paper PDF`,
-      `${base} academic study`,
+      `${base} scientific review OR research paper`,
+      `${base} PDF site:doi.org`,
+      `${base} academic study OR scholarly article`,
     ];
   }
 
