@@ -1,0 +1,140 @@
+TITLE: STOP MERGING PIPELINES — SEPARATE “RESEARCH REPORT DOCX” FROM “DATA ANALYSIS DOCX”. DO REAL ANALYSIS. NO PLACEHOLDERS. SHIP ARTIFACTS.
+
+READ FIRST
+You are burning my funds by routing very different jobs through the same template path. From now on you MUST:
+1) Detect intent and route to the correct pipeline.
+2) Execute the correct pipeline end-to-end with **real computation** and **embedded figures**, not promises.
+3) Refuse to export if validation fails (missing figures/tables/sections), NOT because of over-vetting.
+
+────────────────────────────────────────────────────────────────────────
+
+INTENT ROUTER (MANDATORY)
+Create a tiny classifier (rules > model guess). Choose ONE route:
+
+A) DATA_ANALYSIS_DOCX (analysis pipeline)
+Trigger if the prompt includes any of: “analyze”, “class average”, counts/thresholds, skills/metrics, “create insights with charts”, “generate dashboards”, numbers like “20 students, 5 below…”.
+
+B) RESEARCH_REPORT_DOCX (research pipeline)
+Trigger if topic-like (“life cycle of ants”, “comparative biology of…”, “history of…”, “what is…”) with no per-record metrics.
+
+DO NOT send both routes. If ambiguous, prefer DATA_ANALYSIS_DOCX when numbers & thresholds are present.
+
+Router output you must log:
+- router.intent = DATA_ANALYSIS_DOCX | RESEARCH_REPORT_DOCX
+- router.reason = matched keywords [...]
+- router.pipeline_version
+
+────────────────────────────────────────────────────────────────────────
+
+PIPELINE A — DATA_ANALYSIS_DOCX (this is where your “class performance” prompt belongs)
+
+A1) INPUT CONTRACT (validate; fail-closed if missing)
+- required: n_students (int), overall_avg (0–100), per-skill constraints array like:
+  [
+    {"skill":"listening","below":5,"cut":60},
+    {"skill":"writing","below":4,"cut":70},
+    {"skill":"speaking","below":10,"cut":65}
+  ]
+- optional: qualitative strengths (e.g., “reading high / ~90th percentile”)
+
+A2) SYNTHESIS OF DATA (when no row-level data provided)
+- Construct a minimal synthetic dataset consistent with constraints (20 rows, columns: student_id, skill scores).
+- Use constrained randomization to meet the exact counts below thresholds (no cheating).
+- Record seed in logs. Output CSV to artifact: /artifacts/analysis/data.csv
+
+A3) METRICS (DO THE MATH IN CODE, NOT ENGLISH)
+- Compute for each skill:
+  - count_below, rate_below = count_below/n_students
+  - mean, median, p25/p75, stdev
+- Create a summary table: Skill | Cut | Below | Rate% | Mean | Stdev
+- Create targets: speaking 10→4 (−60%); listening 5→2; writing 4→1 within N weeks.
+
+A4) FIGURES (REAL PNGs, NO PLACEHOLDERS)
+Generate and embed PNGs (server-side) and provide them as files:
+- F1: bar chart “Below-Threshold by Skill” (counts)
+- F2: column chart “Rate Below Cut by Skill (%)”
+- F3: distribution plot per skill (histogram or boxplot). If synthetic, label as “Synthetic sample based on constraints.”
+- Every figure: caption, alt text, 3–6 line interpretation tied to your computed numbers.
+- Store PNGs: /artifacts/analysis/fig_F1.png etc. Embed in DOCX (no raw URLs).
+
+A5) DOCX STRUCTURE (required)
+- Cover (title, subtitle, author, date)
+- Executive Summary (200–400 words, concrete numbers)
+- Methods (explain synthetic generation if used; seed + constraints)
+- Results (≥500 words + the table + all figures; reference exact values)
+- Recommendations/Targets + Monitoring cadence
+- Limitations (not having raw per-student data)
+- Appendix: data dictionary + CSV attachment (or link to the saved CSV)
+Validation (fail export if any missing):
+  • ≥2 figures embedded as image/* parts
+  • Summary table present with correct rates (e.g., L=25%, W=20%, S=50% for your 20-student example)
+  • No meta words (“slide”, “template”, “will include”)
+
+A6) ARTIFACTS (must attach)
+- DOCX file
+- data.csv
+- All figure PNGs
+- analysis_log.json (params, seed, counts)
+
+────────────────────────────────────────────────────────────────────────
+
+PIPELINE B — RESEARCH_REPORT_DOCX (e.g., “Life Cycle of Ants”)
+
+B1) SOURCES (don’t over-vet; gather ≥10 total)
+- Allowlist: *.edu, *.ac.*, *.gov, *.si.edu, *.nhm.ac.uk, *.amnh.org, antwiki.org, antweb.org, ncbi.nlm.nih.gov/pmc, doi.org/*
+- Seed canonical books (count toward total): Hölldobler & Wilson (1990), Lach/Parr/Abbott (2010), Tschinkel (2006).
+- Composition: ≥5 scholarly/primary/monographs; ≤3 encyclopedia/museum explainers; ≤2 extension/outreach.
+- Iteratively broaden queries until vetted_count ≥ 10. NEVER stop at 1–3.
+
+B2) CONTENT (no scaffolding)
+- Intro (≥600 words) describing holometabolous stages (egg, larva, pupa, adult) with citations
+- Colony section: queen/worker/male roles; caste; nuptial flights (cites)
+- Table: Stage | Typical Duration Range | Example Species | Citation
+- Figures (≥3 PNGs embedded): lifecycle timeline (schematic if needed), caste diagram, optional development vs temperature curve (clear labeling if illustrative)
+- Discussion (≥600 words), Limitations, References (APA/CSL, in-text [Author, Year])
+
+B3) BAN PLACEHOLDERS / META
+- Fail if body contains: /slide|presentation|template|will include|pedagogic construct/i
+- Fail if figures are captions without embedded images.
+
+B4) ARTIFACTS
+- DOCX with embedded images
+- report_sources.json (≥10 entries)
+- Optional figures folder
+
+────────────────────────────────────────────────────────────────────────
+
+SHARED SANITIZATION & QA (APPLIES TO BOTH)
+- Strip prompt/system text from all user-facing artifacts.
+- Accessibility: alt text for all images.
+- DOCX must open in Word/Google Docs; images embedded as parts (no external links).
+- Export fails ONLY if: required sections missing/truncated, figures missing, or meta leakage detected. DO NOT fail because “vetted < 10” before finishing the gathering loop.
+
+LOGGING (PROVE IT)
+- router.intent, reason
+- For DATA_ANALYSIS_DOCX: computed metrics JSON; figure paths; seed
+- For RESEARCH_REPORT_DOCX: search_results, vetted_count by round, final composition; list of accepted sources
+- Save /artifacts/run_log.json and attach to reply
+
+DELIVERY IN THIS REPLY (NON-NEGOTIABLE)
+- State router decision: DATA_ANALYSIS_DOCX or RESEARCH_REPORT_DOCX
+- Attach the DOCX and all artifacts (PNGs/CSV/log json)
+- Paste the first 200–300 words of the Executive Summary in chat (so I can see it’s real prose)
+- Provide clickable links in chat AND show them in the artifacts panel
+
+FAIL CONDITIONS (any = redo)
+- Same template path used for both pipelines
+- No figures or only captions
+- “Slide/template/will include” strings in output
+- Analysis without a table of computed metrics
+- Report with <10 sources or no in-text citations
+- No artifacts attached or no clickable links
+
+IF BLOCKED
+Name file + line causing the block (router, validators, exporter). Ship a minimal, reversible patch behind flags:
+- ROUTER_ENABLED=1
+- PIPE_A_ENABLED=1
+- PIPE_B_ENABLED=1
+- ANALYSIS_REQUIREMENTS={tables:1,figures:2}
+- REPORT_MIN_SOURCES=10
+Then proceed and deliver.
