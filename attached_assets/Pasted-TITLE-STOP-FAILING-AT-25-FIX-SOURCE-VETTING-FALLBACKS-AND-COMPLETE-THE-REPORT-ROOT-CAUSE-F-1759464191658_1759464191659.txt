@@ -1,0 +1,86 @@
+TITLE: STOP FAILING AT 25% — FIX SOURCE VETTING + FALLBACKS AND COMPLETE THE REPORT
+
+ROOT CAUSE (FROM LOGS):
+- Stage: “Vetting sources” → “Source vetting: 1 vetted, 23 rejected” → “FAIL: minimum 3 required” → pipeline aborts at 25%.
+- Duplicative rejections and truncated URLs show the normalizer is broken (same URL rejected multiple times; line-wrapped PDF URL truncated).
+- Result: no content generation, no charts, no DOCX, just a hard stop.
+
+MANDATES — IMPLEMENT IN ONE PASS
+
+A) VETTING POLICY (ALLOWLIST + BLOCKLIST + NORMALIZER)
+1) Domain allowlist patterns (accept by default):
+   - *.edu, *.gov, *.ac.*, *.museum*, *.nhm.*, *.amnh.org
+   - Peer-reviewed aggregators: ncbi.nlm.nih.gov/pmc, doi.org/*
+   - Reputable biology orgs: antwiki.org, antweb.org, biodiversitylibrary.org, smithsonian (institution sites, not magazines), britannica.com (fallback only)
+   - University extension & museums: ufl.edu/ifas, ucdavis.edu/ipm, nhm.ac.uk, nmnh.si.edu
+2) Blocklist patterns (reject for citations): studocu.com, scribd.com, misfitanimals.com, geeksforgeeks.org (biology), calculator sites, generic K-12 craft blogs, “AI report generator” sites.
+3) URL normalizer:
+   - Trim/unwrap line breaks; canonicalize (strip UTM, #fragments).
+   - Deduplicate by hostname+path.
+   - Validate content-type (text/html, application/pdf) and status 200 before scoring.
+
+B) VETTING SCORING (DON’T OVER-REJECT)
+- Score by authority (domain), recency, and topic match. Accept if score ≥0.6.
+- If ≥1 high-authority source + ≥1 secondary (encyclopedia, museum page) exist, that **meets** the minimum.
+- Do NOT reject UC outreach/museum education pages; they’re fine for lifecycle basics.
+
+C) MULTI-STAGE FALLBACKS (NEVER HARD-FAIL)
+If vetted_sources < 3:
+  F1) Broaden queries (synonyms/Latin): "Formicidae holometabolous larval pupal development", "ant queen egg larva pupa duration site:edu OR site:gov", "Ant lifecycle review PDF".
+  F2) Google Scholar / PMC scraping of abstracts and references (titles + DOI only; don’t screen-scrape copyrighted PDFs).
+  F3) Known references seed (preload in code):
+      - Hölldobler & Wilson, *The Ants* (1990) — ISBN/DOI
+      - Lach, Parr & Abbott, *Ant Ecology* (2010)
+      - Tschinkel (2006), *The Fire Ants* — selected lifecycle chapters
+      - Britannica (Ant; Insect metamorphosis) — fallback
+  F4) If still <3, CONTINUE ANYWAY with a “Limited Sources” banner and clearly labeled **schematic** figures. DO NOT abort the pipeline.
+
+D) CONTINUE THE PIPELINE (NO STOP AT 25%)
+- Replace “minimum 3 required” with: produce report with whatever is vetted; add a Sources Quality panel describing limitations.
+- Progress bar must advance: Research(0–25) → Draft(25–60) → Figures(60–85) → DOCX(85–100). Never freeze at 25.
+
+E) CONTENT CONTRACT & QA GATES (FAIL-CLOSED ON REAL PROBLEMS, NOT ON SOURCES COUNT)
+Before DOCX export, validate this JSON:
+{
+  cover, executive_summary(250–400 words), introduction(≥600, cites),
+  biology(egg/larva/pupa/adult with durations/ranges + cites),
+  colony_section(queen/worker/male roles + cites),
+  tables([Stage, Typical Duration Range, Example Species, Citation]),
+  figures(≥3 PNGs embedded with captions+alt),
+  discussion(≥600), references(formatted; resolve in-text cites)
+}
+Reject ONLY if sections are empty/truncated or figures missing. Do not reject on “only 2 vetted sources” → just add the “Limited Sources” banner.
+
+F) FIGURES PIPELINE (NO PLACEHOLDERS)
+- Generate actual PNGs:
+  - F1: lifecycle timeline (schematic label OK)
+  - F2: caste/role diagram
+  - F3: optional temperature vs development curve (use generic literature range with citation; if unknown, label as illustrative)
+- Embed PNGs in DOCX; captions + alt text required. ZERO raw chart URLs.
+
+G) CITATION HANDLING
+- In-text `[Author, Year]` for all biology claims; bibliography with DOI/URL where legal.
+- If a source is generic encyclopedia/museum, cite it clearly as such.
+- Ban blocklisted domains from the final reference list (build fails if present).
+
+H) LOGGING FIXES (SO WE CAN SEE WHAT YOU DID)
+- Log exact counts per stage: “search_results=24, vetted=5 (list…), fallback_used=F2”.
+- Log which fallback hit resolved minimum.
+- Stop duplicate rejection lines; print unique host/path once.
+- Persist a `report_sources.json` with final citations used.
+
+I) ACCEPTANCE TESTS (RUN BEFORE REPLYING “FIXED”)
+- Simulate “life cycle of ants” again:
+  - Pipeline DOES NOT abort at 25%; progresses through to DOCX export.
+  - DOCX contains ≥3 embedded PNG figures (not placeholders).
+  - No “slide/presentation/template” leakage.
+  - References contain only allowlist domains or seeded books with ISBN/DOI.
+  - If vetted<3, a visible “Limited Sources” banner appears in the report; export still succeeds.
+
+DELIVERABLES IN THIS REPLY
+1) Short summary of changes to vetting + fallbacks.
+2) The new ants DOCX as a downloadable artifact.
+3) `report_sources.json` (the final citations).
+4) Log excerpt from a successful run showing Research→Draft→Figures→DOCX progression.
+
+If any of the above is ambiguous, state the exact file and line you need to modify. Otherwise, implement now and deliver.

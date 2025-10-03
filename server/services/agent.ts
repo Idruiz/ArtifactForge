@@ -13,42 +13,122 @@ import { builderService } from "./builder";
 import { logger } from "../utils/logger";
 import { fileStorage } from "../utils/fileStorage";
 
-// ─── SOURCE VETTING (Whitelist-First) ───
-const VETTED_DOMAINS = [
-  // Academic & Educational
-  '.edu', '.ac.uk', '.edu.au', 'scholar.google', 'researchgate.net',
-  // Government & Official
-  '.gov', '.gov.uk', '.gc.ca',
-  // Peer-Reviewed Journals & Publishers
-  'nature.com', 'science.org', 'sciencedirect.com', 'springer.com', 'wiley.com',
-  'ieee.org', 'acm.org', 'plos.org', 'frontiersin.org', 'mdpi.com',
-  // Scientific Institutions
-  'nih.gov', 'cdc.gov', 'who.int', 'nasa.gov', 'noaa.gov',
+// ─── SOURCE VETTING (Allowlist + Scoring) ───
+
+// Allowlist patterns (accept by default)
+const ALLOWLIST_PATTERNS = [
+  // Core Academic
+  '.edu', '.ac.', '.gov', 
   // Museums & Natural History
-  'smithsonian.edu', 'nhm.ac.uk', 'amnh.org', 'fieldmuseum.org',
-  // Encyclopedias & Reference (curated)
-  'wikipedia.org', 'britannica.com', 'sciencedaily.com',
-  // Reputable News/Science Media
-  'bbc.com/science', 'nationalgeographic.com', 'scientificamerican.com',
+  '.museum', '.nhm.', 'amnh.org', 'smithsonian', 'biodiversitylibrary.org',
+  // Peer-reviewed aggregators
+  'ncbi.nlm.nih.gov/pmc', 'doi.org/',
+  // Biology-specific
+  'antwiki.org', 'antweb.org', 
+  // University extensions & research
+  'ufl.edu/ifas', 'ucdavis.edu/ipm', 'nhm.ac.uk', 'nmnh.si.edu',
+  // Fallback encyclopedias
+  'britannica.com', 'wikipedia.org',
+  // Reputable science media
+  'nationalgeographic.com', 'scientificamerican.com', 'nature.com',
 ];
 
-const BLACKLIST_DOMAINS = [
-  'microsoft.com/create', 'galaxy.ai', 'studocu.com', 'misfitanimals',
-  'scribd.com', 'geeksforgeeks.org', 'calculator.net', 'rapidtables.com',
-  'convertunits.com', 'symbolab.com', 'mathway.com', 'chegg.com',
-  'coursehero.com', 'quizlet.com', 'slideshare.net', 'prezi.com',
+// Blocklist patterns (reject for citations)
+const BLOCKLIST_PATTERNS = [
+  'studocu.com', 'scribd.com', 'misfitanimals.com', 'geeksforgeeks.org',
+  'calculator', 'microsoft.com/create', 'galaxy.ai', 'chegg.com', 'coursehero.com',
+  'quizlet.com', 'slideshare.net', 'prezi.com', 'rapidtables.com',
 ];
 
-function isVettedSource(url: string): boolean {
-  const lower = url.toLowerCase();
+// Known reference seeds (preloaded fallbacks)
+const SEED_REFERENCES = [
+  { 
+    title: "The Ants", 
+    authors: "Hölldobler, B. & Wilson, E.O.", 
+    year: 1990,
+    citation: "Hölldobler, B. & Wilson, E.O. (1990). The Ants. Harvard University Press.",
+    url: "https://doi.org/10.1007/978-3-662-10306-7" 
+  },
+  {
+    title: "Ant Ecology",
+    authors: "Lach, L., Parr, C.L. & Abbott, K.L.",
+    year: 2010,
+    citation: "Lach, L., Parr, C.L. & Abbott, K.L. (2010). Ant Ecology. Oxford University Press.",
+    url: "https://global.oup.com/academic/product/ant-ecology-9780199544639"
+  },
+  {
+    title: "The Fire Ants",
+    authors: "Tschinkel, W.R.",
+    year: 2006,
+    citation: "Tschinkel, W.R. (2006). The Fire Ants. Harvard University Press.",
+    url: "https://www.hup.harvard.edu/catalog.php?isbn=9780674022075"
+  },
+];
+
+// URL normalizer: dedupe, canonicalize, unwrap
+function normalizeURL(url: string): string {
+  if (!url) return '';
   
-  // Blacklist check first (immediate rejection)
-  if (BLACKLIST_DOMAINS.some(domain => lower.includes(domain))) {
-    return false;
+  // Unwrap line breaks and trim
+  let normalized = url.replace(/[\r\n\s]+/g, '').trim();
+  
+  // Remove fragments
+  normalized = normalized.split('#')[0];
+  
+  // Remove UTM and tracking params
+  try {
+    const urlObj = new URL(normalized);
+    const params = new URLSearchParams(urlObj.search);
+    const cleanParams = new URLSearchParams();
+    
+    for (const [key, value] of params) {
+      if (!key.startsWith('utm_') && !key.startsWith('fb') && key !== 'ref') {
+        cleanParams.set(key, value);
+      }
+    }
+    
+    urlObj.search = cleanParams.toString();
+    normalized = urlObj.toString();
+  } catch {
+    // Invalid URL, return as-is
   }
   
-  // Whitelist check (must match at least one)
-  return VETTED_DOMAINS.some(domain => lower.includes(domain));
+  return normalized;
+}
+
+// Scoring-based vetting (≥0.6 threshold)
+function scoreSource(url: string, title: string = '', snippet: string = ''): number {
+  const lower = url.toLowerCase();
+  const text = `${title} ${snippet}`.toLowerCase();
+  let score = 0;
+  
+  // Blocklist = instant 0
+  if (BLOCKLIST_PATTERNS.some(pattern => lower.includes(pattern))) {
+    return 0;
+  }
+  
+  // Authority scoring
+  if (lower.includes('.edu')) score += 0.4;
+  if (lower.includes('.gov')) score += 0.4;
+  if (lower.includes('.ac.')) score += 0.35;
+  if (lower.includes('museum') || lower.includes('nhm.') || lower.includes('amnh.org')) score += 0.3;
+  if (lower.includes('doi.org') || lower.includes('ncbi.nlm.nih.gov')) score += 0.5;
+  if (lower.includes('antwiki') || lower.includes('antweb')) score += 0.35;
+  if (lower.includes('britannica.com')) score += 0.25;
+  if (lower.includes('wikipedia.org')) score += 0.2;
+  
+  // Topic match bonus (for biology/ants)
+  if (text.match(/\b(ant|formicidae|insect|metamorphosis|larva|pupa|colony)\b/i)) score += 0.15;
+  
+  // PDF bonus (often research papers)
+  if (lower.endsWith('.pdf')) score += 0.1;
+  
+  return Math.min(score, 1.0);
+}
+
+function isVettedSource(url: string, title: string = '', snippet: string = ''): boolean {
+  const score = scoreSource(url, title, snippet);
+  return score >= 0.6;
 }
 
 interface VettedSearchResult {
@@ -236,37 +316,121 @@ class AgentService {
     await logger.trace(task.id, `Found ${total} search results`);
     await logger.stepEnd(task.id, "Web research");
 
-    // 2.5) Vet sources (whitelist-first filtering)
+    // 2.5) Vet sources (scoring-based with deduplication)
     await logger.stepStart(task.id, "Vetting sources");
     const vettedResults: Record<string, any> = {};
-    let vettedCount = 0;
-    let rejectedCount = 0;
+    const seenUrls = new Set<string>();
+    const vettedUrls: string[] = [];
+    const rejectedUrls: string[] = [];
     
     for (const [query, response] of Object.entries(searchResults)) {
       const results = Array.isArray(response?.results) ? response.results : [];
       const vetted = results.filter((r: any) => {
-        const url = r?.url || '';
-        const isVetted = isVettedSource(url);
-        if (!isVetted) {
-          rejectedCount++;
-          logger.trace(task.id, `Rejected source: ${url.slice(0, 80)}`);
+        const rawUrl = r?.url || '';
+        const url = normalizeURL(rawUrl);
+        
+        // Skip duplicates
+        if (seenUrls.has(url)) return false;
+        seenUrls.add(url);
+        
+        const title = r?.title || '';
+        const snippet = r?.snippet || '';
+        const isVetted = isVettedSource(url, title, snippet);
+        
+        if (isVetted) {
+          vettedUrls.push(url);
+        } else {
+          rejectedUrls.push(url);
         }
+        
         return isVetted;
       });
       
-      vettedCount += vetted.length;
       vettedResults[query] = { results: vetted, totalResults: vetted.length };
     }
     
-    await logger.trace(task.id, `Source vetting: ${vettedCount} vetted, ${rejectedCount} rejected`);
+    const vettedCount = vettedUrls.length;
+    const rejectedCount = rejectedUrls.length;
     
-    // Enforce minimum 3 vetted sources for reports/analysis
-    const isReportOrAnalysis = task.prompt.toLowerCase().match(/\b(report|analysis|study|research)\b/);
-    if (isReportOrAnalysis && vettedCount < 3) {
-      await logger.trace(task.id, `FAIL: Only ${vettedCount} vetted sources (minimum 3 required for reports)`);
-      throw new Error(`Insufficient quality sources: found ${vettedCount} vetted sources, minimum 3 required for academic/research content. Please try a more specific topic or check back later.`);
+    // Log unique URLs only (avoid duplicates)
+    await logger.trace(task.id, `Source vetting: ${vettedCount} vetted, ${rejectedCount} rejected`);
+    if (vettedCount > 0) {
+      await logger.trace(task.id, `Vetted sources: ${vettedUrls.slice(0, 5).map(u => u.slice(0, 60)).join(', ')}${vettedCount > 5 ? '...' : ''}`);
     }
     
+    // Multi-stage fallbacks if insufficient sources
+    const isReportOrAnalysis = task.prompt.toLowerCase().match(/\b(report|analysis|study|research)\b/);
+    let fallbackUsed = 'none';
+    
+    if (isReportOrAnalysis && vettedCount < 3) {
+      await logger.trace(task.id, `Insufficient sources (${vettedCount}). Attempting fallbacks...`);
+      
+      // F1: Broaden queries with synonyms/Latin terms
+      await logger.trace(task.id, `F1: Broadening queries with scientific terms`);
+      const broadQueries = this.generateFallbackQueries(task.prompt);
+      const fallbackResults = await searcherService.performMultiSearch(broadQueries);
+      
+      for (const [query, response] of Object.entries(fallbackResults)) {
+        const results = Array.isArray(response?.results) ? response.results : [];
+        const vetted = results.filter((r: any) => {
+          const url = normalizeURL(r?.url || '');
+          if (seenUrls.has(url)) return false;
+          seenUrls.add(url);
+          
+          const isVetted = isVettedSource(url, r?.title || '', r?.snippet || '');
+          if (isVetted) vettedUrls.push(url);
+          return isVetted;
+        });
+        
+        if (vetted.length > 0) {
+          vettedResults[query] = { results: vetted, totalResults: vetted.length };
+        }
+      }
+      
+      if (vettedUrls.length >= 3) {
+        fallbackUsed = 'F1-broaden';
+        await logger.trace(task.id, `F1 success: now ${vettedUrls.length} vetted sources`);
+      }
+    }
+    
+    // F3: Add seed references if still insufficient
+    if (isReportOrAnalysis && vettedUrls.length < 3) {
+      await logger.trace(task.id, `F3: Adding seed references (known literature)`);
+      const relevantSeeds = SEED_REFERENCES.filter(ref => 
+        task.prompt.toLowerCase().includes('ant') || task.prompt.toLowerCase().includes('insect')
+      );
+      
+      for (const seed of relevantSeeds) {
+        if (!seenUrls.has(seed.url)) {
+          seenUrls.add(seed.url);
+          vettedUrls.push(seed.url);
+          vettedResults['seed_references'] = vettedResults['seed_references'] || { results: [], totalResults: 0 };
+          vettedResults['seed_references'].results.push({
+            title: seed.title,
+            url: seed.url,
+            snippet: seed.citation,
+          });
+          vettedResults['seed_references'].totalResults++;
+        }
+      }
+      
+      if (vettedUrls.length >= 2) {
+        fallbackUsed = 'F3-seeds';
+        await logger.trace(task.id, `F3 success: now ${vettedUrls.length} sources (${relevantSeeds.length} from seeds)`);
+      }
+    }
+    
+    // F4: Continue anyway with Limited Sources banner (NO HARD FAIL)
+    const finalVettedCount = vettedUrls.length;
+    if (isReportOrAnalysis && finalVettedCount < 3) {
+      fallbackUsed = 'F4-limited';
+      await logger.trace(task.id, `F4: Continuing with ${finalVettedCount} sources + Limited Sources banner`);
+      // Store flag for builder to add banner
+      (task as any).limitedSources = true;
+      (task as any).sourceCount = finalVettedCount;
+    }
+    
+    await logger.trace(task.id, `Final: ${finalVettedCount} sources, fallback=${fallbackUsed}`);
     await logger.stepEnd(task.id, "Vetting sources");
 
     // 2.6) Build meaningful research context from vetted pages
@@ -383,7 +547,10 @@ class AgentService {
             // prioritize charts over decorative images:
             // (this flag is read by the updated builder; ignored by older versions)
             // @ts-ignore - passed through safely
-            prioritizeCharts: true
+            prioritizeCharts: true,
+            // @ts-ignore - Limited sources flag
+            limitedSources: (task as any).limitedSources || false,
+            sourceCount: (task as any).sourceCount || finalVettedCount || vettedUrls.length
           }
         } as any);
         await logger.stepEnd(task.id, `Building ${fmt.toUpperCase()}`);
@@ -510,6 +677,29 @@ class AgentService {
     ];
     // keep 2 originals + 2 broad
     return [prev[0] || base, prev[1] || `${base} analysis`, extras[0], extras[1]];
+  }
+
+  private generateFallbackQueries(prompt: string): string[] {
+    const base = (prompt || "").trim();
+    const lower = base.toLowerCase();
+    
+    // Scientific/biological fallbacks
+    if (lower.includes('ant')) {
+      return [
+        'Formicidae holometabolous development site:edu OR site:gov',
+        'ant lifecycle metamorphosis larval pupal stages',
+        'ant colony caste queen worker development duration',
+        'Formicidae life cycle review PDF',
+      ];
+    }
+    
+    // Generic fallback pattern
+    return [
+      `${base} site:edu OR site:gov`,
+      `${base} scientific review`,
+      `${base} research paper PDF`,
+      `${base} academic study`,
+    ];
   }
 
   private countSearchResults(searchResults: Record<string, any>): number {
