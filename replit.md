@@ -72,14 +72,19 @@ Preferred communication style: Simple, everyday language.
 - **R2 Scholar**: site:ncbi.nlm.nih.gov/pmc, site:doi.org, antwiki, museums
 - **R3 Extension**: site:edu extension/IPM, site:gov agriculture/entomology
 - **R4 Synonyms**: development stages, ontogeny, metamorphosis, brood development
-- **STOP**: When vetted_count ≥10, proceed to outline. Otherwise HARD FAIL.
+- **R5 Broader**: biology ecology behavior, reproduction breeding
+- **STOP**: When vetted_count ≥10, proceed to outline. Otherwise continue up to MAX_ROUNDS (10).
+
+**Iterative Loop (MAX_ROUNDS = 10)**:
+- System cycles through R1→R2→R3→R4→R5 repeatedly until ≥10 sources OR 10 rounds exhausted
+- Each round logs progress: `[Round N] strategy → added X, total Y`
+- NO HARD FAIL: Proceeds with whatever sources gathered after max rounds
 
 **Vetting Policy (Sane + Quality)**:
-- **Three-Tier Logic**: 1) Blocklist reject → 2) Allowlist auto-pass → 3) Scoring (≥0.55 threshold)
+- **Three-Tier Logic**: 1) Blocklist reject → 2) Allowlist auto-pass → 3) Scoring (≥0.4 threshold)
 - **Allowlist Patterns**: .edu, .gov, .ac., museums, DOI, PMC, antwiki/antweb, Britannica, Wikipedia, National Geographic, Scientific American, Nature, Smithsonian
 - **Enhanced Scoring**: National Geographic (+0.4), Britannica (+0.4), Wikipedia (+0.3), Nature (+0.5), Smithsonian (+0.4)
 - **Detailed Logging**: Shows decision for each source `[ALLOWLIST→PASS]`, `[SCORE 0.65→PASS]`, `[SCORE 0.42→FAIL]`
-- **Hard Block**: Outline generation blocked if <10 sources. Throws error with round details.
 
 ### DOCX Report Pipeline
 - **6-Stage Validation Pipeline**: Parse → Enrich → Fetch Charts → Validate → Assemble → Pack

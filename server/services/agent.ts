@@ -143,9 +143,9 @@ function isVettedSource(url: string, title: string = '', snippet: string = ''): 
     return true;
   }
   
-  // Fallback to scoring (threshold 0.55 for quality)
+  // Fallback to scoring (threshold 0.4 to allow quality sources)
   const score = scoreSource(url, title, snippet);
-  return score >= 0.55;
+  return score >= 0.4;
 }
 
 interface VettedSearchResult {
@@ -365,7 +365,7 @@ class AgentService {
         let decision = '';
         if (blocklisted) decision = 'BLOCKLIST';
         else if (allowlisted) decision = 'ALLOWLIST→PASS';
-        else if (score >= 0.55) decision = `SCORE ${score.toFixed(2)}→PASS`;
+        else if (score >= 0.4) decision = `SCORE ${score.toFixed(2)}→PASS`;
         else decision = `SCORE ${score.toFixed(2)}→FAIL`;
         
         if (isVetted) {
@@ -392,154 +392,120 @@ class AgentService {
       await logger.trace(task.id, `✗ Rejected (showing first 5): ${rejectedUrls.slice(0, 5).join(' | ')}`);
     }
     
-    // R0-R5 ITERATIVE HARVEST: Keep searching until MIN_VETTED_REQUIRED (10) met
+    // R0-R5 ITERATIVE HARVEST: Keep searching until MIN_VETTED_REQUIRED (10) met OR max rounds exhausted
     const MIN_VETTED_REQUIRED = 10;
+    const MAX_ROUNDS = 10;
     const isReportOrAnalysis = task.prompt.toLowerCase().match(/\b(report|analysis|study|research)\b/);
     let roundsCompleted: string[] = [];
+    let roundNumber = 0;
     
     if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
-      await logger.trace(task.id, `Need ${MIN_VETTED_REQUIRED} sources, have ${vettedUrls.length}. Starting iterative harvest...`);
+      await logger.trace(task.id, `Need ${MIN_VETTED_REQUIRED} sources, have ${vettedUrls.length}. Starting iterative harvest (max ${MAX_ROUNDS} rounds)...`);
       
-      // R0: Seed references (always add if topic-relevant)
-      await logger.trace(task.id, `R0: Adding seed references`);
-      const relevantSeeds = SEED_REFERENCES.filter(ref => 
-        task.prompt.toLowerCase().includes('ant') || task.prompt.toLowerCase().includes('insect')
-      );
-      
-      for (const seed of relevantSeeds) {
-        if (!seenUrls.has(seed.url)) {
-          seenUrls.add(seed.url);
-          vettedUrls.push(seed.url);
-          vettedResults['R0_seeds'] = vettedResults['R0_seeds'] || { results: [], totalResults: 0 };
-          vettedResults['R0_seeds'].results.push({
-            title: seed.title,
-            url: seed.url,
-            snippet: seed.citation,
-          });
-          vettedResults['R0_seeds'].totalResults++;
-        }
-      }
-      roundsCompleted.push(`R0_seeds=${relevantSeeds.length}`);
-      await logger.trace(task.id, `R0 complete: ${vettedUrls.length} total`);
-    }
-    
-    // R1: Topical queries with Latin/scientific terms
-    if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
-      await logger.trace(task.id, `R1: Broadening with topical/scientific queries`);
-      const broadQueries = this.generateFallbackQueries(task.prompt);
-      const r1Results = await searcherService.performMultiSearch(broadQueries);
-      
-      let r1Added = 0;
-      for (const [query, response] of Object.entries(r1Results)) {
-        const results = Array.isArray(response?.results) ? response.results : [];
-        for (const r of results) {
-          const url = normalizeURL(r?.url || '');
-          if (seenUrls.has(url)) continue;
-          seenUrls.add(url);
-          
-          if (isVettedSource(url, r?.title || '', r?.snippet || '')) {
-            vettedUrls.push(url);
-            r1Added++;
-            vettedResults[query] = vettedResults[query] || { results: [], totalResults: 0 };
-            vettedResults[query].results.push(r);
-            vettedResults[query].totalResults++;
+      // R0: Seed references (run once)
+      if (vettedUrls.length < MIN_VETTED_REQUIRED) {
+        roundNumber++;
+        await logger.trace(task.id, `[Round ${roundNumber}] R0: Adding seed references`);
+        const relevantSeeds = SEED_REFERENCES.filter(ref => 
+          task.prompt.toLowerCase().includes('ant') || task.prompt.toLowerCase().includes('insect')
+        );
+        
+        for (const seed of relevantSeeds) {
+          if (!seenUrls.has(seed.url)) {
+            seenUrls.add(seed.url);
+            vettedUrls.push(seed.url);
+            vettedResults['R0_seeds'] = vettedResults['R0_seeds'] || { results: [], totalResults: 0 };
+            vettedResults['R0_seeds'].results.push({
+              title: seed.title,
+              url: seed.url,
+              snippet: seed.citation,
+            });
+            vettedResults['R0_seeds'].totalResults++;
           }
         }
+        roundsCompleted.push(`R0=${relevantSeeds.length}`);
+        await logger.trace(task.id, `R0 → ${vettedUrls.length} total`);
       }
-      roundsCompleted.push(`R1_topical=${r1Added}`);
-      await logger.trace(task.id, `R1 complete: added ${r1Added}, total ${vettedUrls.length}`);
-    }
-    
-    // R2: Scholar/Museum-specific queries
-    if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
-      await logger.trace(task.id, `R2: Scholar/museum-specific searches`);
-      const scholarQueries = [
-        `${task.prompt} site:ncbi.nlm.nih.gov/pmc`,
-        `${task.prompt} site:doi.org`,
-        `${task.prompt} site:antwiki.org OR site:antweb.org`,
-        `${task.prompt} site:smithsonian OR site:nhm.ac.uk OR site:amnh.org`,
+      
+      // R1-R5: Loop multiple times with variations until we hit MIN_VETTED_REQUIRED or MAX_ROUNDS
+      const queryVariations = [
+        // R1: Topical/scientific
+        () => this.generateFallbackQueries(task.prompt),
+        // R2: Scholar-specific
+        () => [
+          `${task.prompt} site:ncbi.nlm.nih.gov/pmc`,
+          `${task.prompt} site:doi.org`,
+          `${task.prompt} site:antwiki.org OR site:antweb.org`,
+          `${task.prompt} site:smithsonian OR site:nhm.ac.uk OR site:amnh.org`,
+        ],
+        // R3: Extension/edu
+        () => [
+          `${task.prompt} site:edu extension OR ipm`,
+          `${task.prompt} site:gov agriculture OR entomology`,
+        ],
+        // R4: Synonyms
+        () => [
+          task.prompt.replace(/life cycle/i, 'development stages'),
+          task.prompt.replace(/life cycle/i, 'ontogeny metamorphosis'),
+          task.prompt + ' brood development caste differentiation',
+        ],
+        // R5: Broader synonyms
+        () => [
+          task.prompt + ' biology ecology behavior',
+          task.prompt.replace(/life cycle/i, 'reproduction breeding'),
+          task.prompt + ' developmental biology insect',
+        ],
       ];
-      const r2Results = await searcherService.performMultiSearch(scholarQueries);
       
-      let r2Added = 0;
-      for (const [query, response] of Object.entries(r2Results)) {
-        const results = Array.isArray(response?.results) ? response.results : [];
-        for (const r of results) {
-          const url = normalizeURL(r?.url || '');
-          if (seenUrls.has(url)) continue;
-          seenUrls.add(url);
-          
-          if (isVettedSource(url, r?.title || '', r?.snippet || '')) {
-            vettedUrls.push(url);
-            r2Added++;
+      while (vettedUrls.length < MIN_VETTED_REQUIRED && roundNumber < MAX_ROUNDS) {
+        const strategyIndex = (roundNumber - 1) % queryVariations.length;
+        const strategy = queryVariations[strategyIndex];
+        const strategyName = ['R1_topical', 'R2_scholar', 'R3_extension', 'R4_synonyms', 'R5_broader'][strategyIndex];
+        
+        roundNumber++;
+        await logger.trace(task.id, `[Round ${roundNumber}] ${strategyName}: searching...`);
+        
+        const queries = strategy();
+        const results = await searcherService.performMultiSearch(queries);
+        
+        let added = 0;
+        for (const [query, response] of Object.entries(results)) {
+          const items = Array.isArray(response?.results) ? response.results : [];
+          for (const r of items) {
+            const url = normalizeURL(r?.url || '');
+            if (seenUrls.has(url)) continue;
+            seenUrls.add(url);
+            
+            if (isVettedSource(url, r?.title || '', r?.snippet || '')) {
+              vettedUrls.push(url);
+              added++;
+              if (!vettedResults[query]) vettedResults[query] = { results: [], totalResults: 0 };
+              vettedResults[query].results.push(r);
+              vettedResults[query].totalResults++;
+            }
           }
         }
-      }
-      roundsCompleted.push(`R2_scholar=${r2Added}`);
-      await logger.trace(task.id, `R2 complete: added ${r2Added}, total ${vettedUrls.length}`);
-    }
-    
-    // R3: Extension/Educational resources
-    if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
-      await logger.trace(task.id, `R3: University extension and educational resources`);
-      const r3Queries = [
-        `${task.prompt} site:edu extension OR ipm`,
-        `${task.prompt} site:gov agriculture OR entomology`,
-      ];
-      const r3Results = await searcherService.performMultiSearch(r3Queries);
-      
-      let r3Added = 0;
-      for (const [query, response] of Object.entries(r3Results)) {
-        const results = Array.isArray(response?.results) ? response.results : [];
-        for (const r of results) {
-          const url = normalizeURL(r?.url || '');
-          if (seenUrls.has(url)) continue;
-          seenUrls.add(url);
-          
-          if (isVettedSource(url, r?.title || '', r?.snippet || '')) {
-            vettedUrls.push(url);
-            r3Added++;
-          }
+        
+        roundsCompleted.push(`${strategyName}=${added}`);
+        await logger.trace(task.id, `${strategyName} → added ${added}, total ${vettedUrls.length}`);
+        
+        if (vettedUrls.length >= MIN_VETTED_REQUIRED) {
+          await logger.trace(task.id, `✓ Target reached: ${vettedUrls.length} sources (${MIN_VETTED_REQUIRED} required)`);
+          break;
         }
       }
-      roundsCompleted.push(`R3_extension=${r3Added}`);
-      await logger.trace(task.id, `R3 complete: added ${r3Added}, total ${vettedUrls.length}`);
-    }
-    
-    // R4: Synonym/related term expansion
-    if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
-      await logger.trace(task.id, `R4: Synonym and related term expansion`);
-      const synonymQueries = [
-        task.prompt.replace(/life cycle/i, 'development stages'),
-        task.prompt.replace(/life cycle/i, 'ontogeny metamorphosis'),
-        task.prompt + ' brood development caste differentiation',
-      ];
-      const r4Results = await searcherService.performMultiSearch(synonymQueries);
       
-      let r4Added = 0;
-      for (const [query, response] of Object.entries(r4Results)) {
-        const results = Array.isArray(response?.results) ? response.results : [];
-        for (const r of results) {
-          const url = normalizeURL(r?.url || '');
-          if (seenUrls.has(url)) continue;
-          seenUrls.add(url);
-          
-          if (isVettedSource(url, r?.title || '', r?.snippet || '')) {
-            vettedUrls.push(url);
-            r4Added++;
-          }
-        }
+      if (vettedUrls.length < MIN_VETTED_REQUIRED) {
+        await logger.trace(task.id, `⚠️ Stopped after ${roundNumber} rounds with ${vettedUrls.length}/${MIN_VETTED_REQUIRED} sources`);
       }
-      roundsCompleted.push(`R4_synonyms=${r4Added}`);
-      await logger.trace(task.id, `R4 complete: added ${r4Added}, total ${vettedUrls.length}`);
     }
     
     const finalVettedCount = vettedUrls.length;
     await logger.trace(task.id, `Harvest complete: ${finalVettedCount} sources. Rounds: ${roundsCompleted.join(', ')}`);
     
-    // ENFORCE: Block outline generation if insufficient sources
+    // Store metadata but DO NOT block - proceed with whatever we have
     if (isReportOrAnalysis && finalVettedCount < MIN_VETTED_REQUIRED) {
-      await logger.trace(task.id, `⚠️ INSUFFICIENT SOURCES: ${finalVettedCount}/${MIN_VETTED_REQUIRED} - cannot proceed to drafting`);
+      await logger.trace(task.id, `⚠️ LIMITED SOURCES: ${finalVettedCount}/${MIN_VETTED_REQUIRED} - continuing anyway`);
       (task as any).limitedSources = true;
       (task as any).sourceCount = finalVettedCount;
     }
@@ -548,21 +514,6 @@ class AgentService {
 
     // 2.6) Build meaningful research context from vetted pages
     const { contextText, topUrls } = await this.gatherResearchContext(vettedResults);
-
-    // ENFORCE: Block outline generation if insufficient sources for reports
-    if (isReportOrAnalysis && finalVettedCount < MIN_VETTED_REQUIRED) {
-      task.status = "failed";
-      task.currentStep = `Failed: Only ${finalVettedCount}/${MIN_VETTED_REQUIRED} sources found`;
-      this.updateStatus(task.sessionId, task);
-      
-      await logger.stepStart(task.id, "BLOCKED: Insufficient sources");
-      await logger.trace(task.id, `Cannot generate report with ${finalVettedCount} sources. Need ${MIN_VETTED_REQUIRED}.`);
-      await logger.trace(task.id, `Iterative harvest rounds completed: ${roundsCompleted.join(', ')}`);
-      await logger.trace(task.id, `Please refine search terms or check if topic has sufficient academic coverage.`);
-      await logger.stepEnd(task.id, "BLOCKED: Insufficient sources");
-      
-      throw new Error(`Insufficient sources for report: ${finalVettedCount}/${MIN_VETTED_REQUIRED}. Completed rounds: ${roundsCompleted.join(', ')}`);
-    }
 
     // 3) Outline
     task.currentStep = "Creating content outline";
