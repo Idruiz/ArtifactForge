@@ -39,6 +39,43 @@ app.use((req, res, next) => {
   next();
 });
 
+// ────────── Serve Generated Static Sites (SYNCHRONOUS SETUP BEFORE VITE) ──────────
+// Create dedicated router for static sites - mounted BEFORE any async operations
+const sitesRouter = express.Router();
+
+// Validation middleware for site ID
+sitesRouter.use((req, res, next) => {
+  const siteId = req.path.split('/')[1]; // /siteId/... or /siteId
+  if (siteId && !/^[a-zA-Z0-9_-]+$/.test(siteId)) {
+    return res.status(400).send("Invalid site ID");
+  }
+  next();
+});
+
+// Mount static middleware per site ID
+sitesRouter.use("/:id", (req, res, next) => {
+  const siteId = req.params.id;
+  const siteDir = path.join(SITES_DIR, siteId);
+  
+  if (!fs.existsSync(siteDir)) {
+    return res.status(404).send("Site not found");
+  }
+  
+  log(`[static-site] Request for /sites/${siteId}${req.path}`);
+  
+  // Serve static files from site directory
+  express.static(siteDir, {
+    extensions: ['html'],
+    index: 'index.html',
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'no-store');
+    }
+  })(req, res, next);
+});
+
+// Mount sites router BEFORE async operations
+app.use("/sites", sitesRouter);
+
 // ────────── bootstrap ──────────
 (async () => {
   // Register API routes FIRST, before Vite
@@ -65,40 +102,6 @@ app.use((req, res, next) => {
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
-  });
-
-  // ────────── Serve Generated Static Sites (BEFORE Vite) ──────────
-  app.get("/sites/:id/*", (req, res, next) => {
-    const siteId = req.params.id;
-    
-    // Validate site ID
-    if (!/^[a-zA-Z0-9_-]+$/.test(siteId)) {
-      return res.status(400).send("Invalid site ID");
-    }
-    
-    // Get requested path (everything after /sites/:id/)
-    let requestedPath = req.params[0] || "";
-    if (!requestedPath || requestedPath === "/") {
-      requestedPath = "index.html";
-    }
-    
-    // Resolve full file path
-    const siteDir = path.join(SITES_DIR, siteId);
-    const filePath = path.join(siteDir, requestedPath);
-    
-    // Security: ensure path is within site directory
-    if (!filePath.startsWith(siteDir)) {
-      return res.status(403).send("Forbidden");
-    }
-    
-    // Check if file exists
-    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-      return res.status(404).send("File not found");
-    }
-    
-    // Set cache control and send file (this completes response, Vite won't run)
-    res.setHeader("Cache-Control", "no-store");
-    res.sendFile(filePath);
   });
 
   // ---------- OpenAI Text-to-Speech proxy ----------
@@ -148,4 +151,7 @@ app.use((req, res, next) => {
   server.listen({ port, host: "0.0.0.0", reusePort: true }, () =>
     log(`serving on port ${port}`),
   );
-})();
+})().catch((error) => {
+  console.error("FATAL: Server startup failed", error);
+  process.exit(1);
+});

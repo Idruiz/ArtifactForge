@@ -1,0 +1,183 @@
+What’s wrong (and why it’s wrong)
+1) It reads like slide notes, not a finished DOCX report
+
+The file literally talks about “this slide” and “presentation” objectives, which is meta copy leaking into a Word deliverable. That’s template scaffolding, not report prose. 
+
+Class_Performance_Analysis_Skil…
+
+2) No actual analysis tables or embedded charts
+
+Sections describe visuals (“bar visualization highlights…”) but there’s no proof of embedded images/tables in the DOCX; it’s narrative about charts instead of charts. A DOCX must contain figures and tables, not promises. 
+
+Class_Performance_Analysis_Skil…
+
+3) Obvious math left undone
+
+You gave exact counts; the doc should compute and show percentages:
+
+Listening: 5/20 = 25% below 60%
+
+Writing: 4/20 = 20% below 70%
+
+Speaking: 10/20 = 50% below 65%
+These should appear in a table + chart; they don’t.
+
+4) Reading is hand-waved
+
+Because reading was “most in the 90th percentile,” the doc simply omits it from visuals entirely “to avoid fabrication.” Fine not to invent numbers, but it still needs a small, clearly-labeled qualitative panel and a rationale box. Instead it punts. 
+
+Class_Performance_Analysis_Skil…
+
+5) Source quality is weak / irrelevant
+
+References include generic blogs and calculator sites (CalculatorGenius, Calculatorsoup, GeeksforGeeks, “grade curve calculator”), which are not appropriate authorities for instructional analytics or assessment practice. This dilutes trust and looks like filler. 
+
+Class_Performance_Analysis_Skil…
+
+6) No dataset or reproducibility appendix
+
+There’s no student-row schema, no CSV appendix, no formulas shown, no provenance. The doc talks about tools and “simple dashboards” instead of shipping minimal reproducible material. 
+
+Class_Performance_Analysis_Skil…
+
+7) Placeholders & padded copy
+
+Long “notes” paragraphs explain intentions and cite generic “research context” instead of delivering concrete findings, thresholds, or targets linked to your numbers. This is padding, not analysis. 
+
+Class_Performance_Analysis_Skil…
+
+8) Inconsistent terminology (percent vs percentile)
+
+The doc echoes “90th percentile” for reading. That may be what you typed, but it should verify whether you meant “~90% scores” or true percentile ranks; then state it explicitly and consistently.
+
+9) Missing acceptability gates
+
+There’s no automated check to fail the export when charts are missing, when meta words like “slide” leak in, when weak sources are present, or when sections are empty. So garbage sails through.
+
+What the agent must implement (one pass, no regressions)
+A) Hard report schema (block incomplete exports)
+
+Before writing any DOCX, the pipeline must assemble this JSON and validate it. If any required field is empty, or contains meta terms (/slide|presentation|will include/i), fail the build.
+
+{
+  "cover": { "title": "", "subtitle": "", "author": "", "date": "" },
+  "executive_summary": { "text": "", "min_words": 200 },
+  "inputs": {
+    "n_students": 20,
+    "overall_avg": 90,
+    "thresholds": {
+      "listening": {"below": 5, "cut": 60},
+      "writing":   {"below": 4, "cut": 70},
+      "speaking":  {"below": 10, "cut": 65},
+      "reading":   {"qualitative": "most ~90th percentile"}
+    }
+  },
+  "tables": [
+    {"title": "Skill Threshold Counts and Rates", "data": [
+      {"skill":"Listening","below":5,"total":20,"rate":0.25,"cut":60},
+      {"skill":"Writing","below":4,"total":20,"rate":0.20,"cut":70},
+      {"skill":"Speaking","below":10,"total":20,"rate":0.50,"cut":65}
+    ]}
+  ],
+  "figures": [
+    {"id":"F1","title":"Below-Threshold by Skill","alt":"Bar chart of below-threshold counts","imagePng": "<binary>"},
+    {"id":"F2","title":"Rates by Skill","alt":"Columns with percentages","imagePng": "<binary>"}
+  ],
+  "sections": {
+    "listening": {"diagnosis":"", "actions":"", "targets":""},
+    "writing":   {"diagnosis":"", "actions":"", "targets":""},
+    "speaking":  {"diagnosis":"", "actions":"", "targets":""},
+    "reading":   {"strengths":"qualitative summary; no numbers fabricated", "transfer_strategies":""}
+  },
+  "references": [
+    {"title":"","source":"","url":"","type":"scholarly|gov|edu|district"}
+  ],
+  "appendices": {
+    "data_dictionary": [{"field":"student_id","type":"string","notes":"anonymized"}, {"field":"skill","type":"enum"}, {"field":"score","type":"number"}],
+    "method_notes": "how percentages were computed; how reading was handled",
+    "csv_sample_b64": "<base64 optional>"
+  }
+}
+
+B) Real charts, actually embedded
+
+Generate PNGs (server-side charting or quickchart → fetch PNG) and embed them in the DOCX; never paste chart URLs as text. Include captions + alt text under each figure. The current file only talks about visuals. 
+
+Class_Performance_Analysis_Skil…
+
+C) Minimal tables that do the math
+
+Insert a table with counts and percent rates (like above). Bold the largest gap (speaking 50%). Include a one-line interpretation per row.
+
+D) Reading handled explicitly (no fabrication, still present)
+
+Add a small “Reading (qualitative)” card: “Majority at high performance; numeric distribution not provided; excluded from threshold plots by design.” That’s honest and useful.
+
+E) Source policy (clean it up)
+
+Allowed: district/Ministry guidance, peer-reviewed journals, university/extension sites (.edu/.gov), reputable assessment bodies.
+
+Disallowed in references: calculator sites, general tech blogs, essay farms, coding tutorials used for math how-tos. The current references list includes these—reject on export if they appear. 
+
+Class_Performance_Analysis_Skil…
+
+F) Anti-leak & anti-padding filters
+
+Strip/fail on: slide, presentation, template, will include, “this slide clarifies…”. (Your doc has this). 
+
+Class_Performance_Analysis_Skil…
+
+Ban “notes:” sections in the final DOCX. Keep internal notes in logs, not in the deliverable.
+
+G) Targets & monitoring that use your numbers
+
+For each weak skill include a measurable target tied to counts, e.g.:
+
+Speaking: reduce below-65% from 10 → 4 within 6 weeks; biweekly checks.
+
+Listening: 5 → 2; Writing: 4 → 1.
+
+Add a small “Next reassessment date” field.
+
+H) Packaging & reproducibility
+
+DOCX that opens cleanly, with embedded images (not links).
+
+Optional: attach a tiny CSV (student_id anonymized, skill, score) if available; otherwise include a clear data dictionary stating limitations.
+
+I) Guardrails (automated tests)
+
+Figure presence test: ≥2 PNG images embedded.
+
+Math test: verify 5/20=25%, 4/20=20%, 10/20=50% appear in the table.
+
+Leak test: reject if /slide|presentation|template|will include/i in body.
+
+Source test: reject if references contain calculator sites/bloggy domains from the current list. 
+
+Class_Performance_Analysis_Skil…
+
+Consistency test: flag if “percentile” is used when inputs imply percent.
+
+Paste-back directive for the Replit agent (no wiggle room)
+TITLE: FIX DATA-ANALYSIS DOCX PIPELINE — EMBED CHARTS, DO THE MATH, BAN WEAK SOURCES, FAIL ON META LEAKS
+
+SCOPE (MANDATORY):
+1) Enforce the JSON schema above; fail export on any missing or meta-filled field.
+2) Compute and display: Listening 5/20=25%, Writing 4/20=20%, Speaking 10/20=50%. Insert a table and two charts; embed as PNGs with captions+alt text.
+3) Include a “Reading (qualitative)” panel (no fabricated numbers) with a clear rationale.
+4) Replace the current reference list with allowed sources only; reject export if disallowed domains are present (calculator sites, generic blogs/tutorials).
+5) Strip/fail on meta leakage (`slide`, `presentation`, `template`, `will include`, “Notes:” blocks).
+6) Add explicit improvement targets per weak skill and a monitoring cadence.
+7) Package a clean DOCX that opens in Word/Google Docs with embedded images (no external links).
+
+ACCEPTANCE CHECKLIST (RUN BEFORE YOU REPLY “FIXED”):
+- DOCX contains ≥2 embedded charts (PNG), a threshold table with counts and rates, and no meta words.
+- Table shows 25%, 20%, 50% for L/W/S respectively.
+- Reading is present as a qualitative callout with rationale.
+- References contain only allowed domains.
+- No “slide/presentation/notes/template” strings in final document.
+- DOCX opens without errors.
+
+IF BLOCKED:
+State exact file+line and ship a minimal reversible fix behind a feature flag. Do not downscope. Deliver the DOCX as a downloadable artifact in this reply.

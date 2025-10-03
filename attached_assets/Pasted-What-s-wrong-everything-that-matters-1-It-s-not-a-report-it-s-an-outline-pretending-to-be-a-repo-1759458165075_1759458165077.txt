@@ -1,0 +1,266 @@
+What’s wrong (everything that matters)
+1) It’s not a report; it’s an outline pretending to be a report
+
+The file repeatedly describes what a slide or section “will” contain instead of actually providing content. That’s meta-outline language, not a deliverable. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+It leans on “template guidance” and “this slide…” across sections rather than writing the section. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+ 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+2) Placeholders and empty promises instead of substance
+
+Whole sections are bullet lists of what should be there (e.g., “One-page narrative… pointers to figures…”), but there’s no narrative, no figures, no data. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Copy repeats fragments like “egg, larva, pupa, and adult” with no actual biology, methods, or results filled in. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+3) Source quality is weak or irrelevant
+
+Relies on Microsoft Create (a design template gallery) as if it were a scientific source; that’s layout advice, not biology. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Cites Scribd, GeeksforGeeks, general blogs, and summary pages as informing biology/methods—these are not primary or peer-reviewed authorities. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+ 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+ 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Mentions UC IPM and a YourWildlife PDF (ok for outreach) but still treats them at the same level as blogs and template sites. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+4) No data, no figures, no embedded charts
+
+Visualization sections merely list what types of charts could exist, not actual figures, images, or embedded assets appropriate for DOCX. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+There’s guidance to use PNG/SVG and packaging advice, yet the file contains zero actual images or tables. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+5) Formatting and voice are wrong for a DOCX deliverable
+
+Consistent use of “This slide…” throughout a supposed Word report. That’s a workflow/PowerPoint artifact bleeding into a DOCX. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+ 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Future tense (“will be… will adopt… will describe…”) instead of completed, declarative report prose. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+ 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+6) Misaligned structure vs. promised content
+
+Sections specify “Executive Summary, Methods, Results, Discussion…” but none of those sections actually contain those parts—just bullets promising them. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+References are pasted as a grab-bag without in-text citations tied to claims, so you can’t trace any statement to a source. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+7) Likely prompt/template leakage
+
+Repeated mentions of “Microsoft Create templates” and “this slide will…” suggest the generator piped internal scaffolding into the final document instead of compiling it into finished copy. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+ 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+8) Accessibility is performative, not implemented
+
+It talks about alt-text and accessibility but embeds no actual images or alt text. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+9) Reproducibility claims with no reproducible material
+
+Mentions R Markdown/python-docx, version control, data-availability notes—none of which are provided or linked. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+ 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+What the agent must fix (one pass, no regressions)
+A) Hard “content compiler” contract (no more outlines)
+
+Implement a strict schema the generator must satisfy before saving a DOCX:
+
+cover: {title, subtitle, author, date} — required
+
+exec_summary: 250–400 words, plain text — required
+
+introduction: >=600 words with in-text citations [Author, Year] — required
+
+methods: >=600 words + at least one table — required
+
+results: >=600 words + ≥3 embedded charts/images — required
+
+discussion: >=600 words with citations — required
+
+references: CSL/APA formatted, deduped — required
+
+figures: [ {caption, image(binary/png), altText} … ] — required
+Block save if any required field is empty, in future tense, or contains “This slide/This section will…”.
+
+B) Source policy (whitelist + blacklist)
+
+Whitelist: peer-reviewed journals, university/extension sites, government/standards bodies, museum/natural history institutions (e.g., UC IPM, academic presses).
+
+Blacklist in final prose: Microsoft Create (layouts only), Scribd mirrors, GeeksforGeeks summaries, blogs like “entomologist.net” (unless the author is a credentialed entomologist and the piece is citable), essay farms (IvyPanda), ResearchGate non-peer-review uploads. The current file violates this repeatedly. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Enforce: every factual claim requires at least one whitelisted citation; fail the build if blacklist domains appear in references.
+
+C) Chart/image pipeline that actually embeds
+
+Render charts to PNG (or SVG converted to PNG) and embed them; no raw URLs or “will include figure” notes.
+
+Each figure must have: number, caption, altText, and a 5–10 line interpretation below it.
+
+Include adjacent data tables for each figure (small, readable). The file currently has none. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+D) Sanitization & leakage prevention
+
+Strip any string matching \b(this slide|will (describe|include)|template|Microsoft Create)\b from final prose (allowed in internal logs only). Current draft leaks these meta-phrases. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+ 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Replace with concrete content before export.
+
+E) Formatting & style enforcement (Word)
+
+Apply a real DOCX style set: Heading 1–3, Normal, Caption, Table Text.
+
+Intro/Methods/Results/Discussion each >600 words; Executive Summary ≤1 page; consistent 11–12 pt body; 1.15–1.2 line spacing. The current file only talks about styles. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+F) References done properly
+
+Replace the “link dump” with formatted references; enforce in-text citations that resolve to the bibliography. The current dump is unlinked to claims. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Deduplicate, add publication year, publisher/journal, DOI where available.
+
+G) Accuracy & scope fixes (biology)
+
+Require a concise, species-agnostic life-cycle section (egg → larva → pupa → adult) with actual durations/ranges and ecological notes, cited to primary/academic sources—not tutorial blogs. The present copy is fragmentary. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Distinguish clearly between organism life-stage biology and colony-level phases; tie claims to citations (not to layout sites). 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+H) QA gates (fail the build if unmet)
+
+No future tense in body (except in “Next steps”).
+
+Min word count per section met.
+
+≥3 figures embedded with captions & alt text.
+
+Leak check: reject if any of: “This slide”, “will include”, “template”, “Microsoft Create” appear in exported DOCX.
+
+Source check: reject if blacklist domains appear in references.
+
+Accessibility: all images must have alt text.
+
+I) Packaging
+
+DOCX must open without corruption and contain images as image/* parts—not external links.
+
+Provide a zipped “Figures/” folder and a “Data/” folder with CSVs used in figures (or a short statement if synthetic/educational).
+
+One-shot acceptance checklist for the agent
+
+Mark these PASS/FAIL before replying “fixed”:
+
+Structure: Cover, Exec Summary, Intro, Methods, Results, Discussion, References, Appendices all present and non-empty (meets word counts).
+
+No meta text: grep output; zero matches for This slide|will include|Microsoft Create. (The current file fails here.) 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+ 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Citations: All claims with [Author, Year]; bibliography formatted; no Scribd/GeeksforGeeks/IvyPanda/“template” URLs. (Current file lists them.) 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Figures: ≥3 embedded PNGs with captions + adjacent small tables. (Current file has none; only “will include” talk.) 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Accessibility: all images have alt text.
+
+Accuracy: A clear, cited description of stages + colony phases with durations/ranges and proper sources (not blogs). (Current file: fragmentary.) 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+No prompt leakage anywhere in the DOCX.
+
+Packaging: DOCX opens in Word/Google Docs; images embedded as parts; figures/data shipped.
+
+TL;DR for the agent (pin this)
+
+Stop outputting outlines. Compile finished prose.
+
+Replace weak sources with vetted academic/extension sources; blacklist template/blog/“essay help” domains from the reference list. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Embed real charts/images; no raw URLs; add captions + alt text. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Purge “This slide/ will include / Microsoft Create” from final DOCX. 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+ 
+
+Life_Cycle_of_Ants_DOCX_Report_…
+
+Enforce a strict schema + QA gates that fail the build if any required content is missing or meta.
+
+Ship a DOCX that reads like a report, not a project plan.
