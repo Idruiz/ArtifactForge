@@ -59,3 +59,23 @@ Preferred communication style: Simple, everyday language.
 
 ### Database
 - **Neon Database**: Serverless PostgreSQL hosting, utilizing `@neondatabase/serverless` driver and Drizzle Kit for schema management.
+
+## Recent Updates (October 3, 2025)
+
+### CRITICAL FIX: Source Vetting System
+**Problem**: Allowlist patterns were defined but never used - 23/24 sources rejected due to scoring-only gate
+**Root Cause**: `isVettedSource()` only checked score ≥0.6, but authoritative sources (Britannica, National Geographic) scored 0.25-0.4
+**Solution Implemented**:
+- **Three-Tier Vetting Logic**: 1) Blocklist reject → 2) Allowlist auto-pass → 3) Scoring (≥0.3 threshold)
+- **Allowlist Patterns**: .edu, .gov, .ac., museums, DOI, PMC, antwiki/antweb, Britannica, Wikipedia, National Geographic, Scientific American, Nature, Smithsonian
+- **Enhanced Scoring**: National Geographic (+0.4), Britannica (+0.4), Wikipedia (+0.3), Nature (+0.5), Smithsonian (+0.4)
+- **Detailed Logging**: Shows rejected sources with scores for debugging (e.g., "url (score: 0.25)")
+- **Multi-Stage Fallbacks**: F1 (broaden queries), F3 (seed references), F4 (Limited Sources banner)
+
+### DOCX Report Pipeline
+- **6-Stage Validation Pipeline**: Parse → Enrich → Fetch Charts → Validate → Assemble → Pack
+- **Citation Mapping**: [Source1] tags → superscript [1] references linked to bibliography
+- **Table Generation**: Extracts numeric bullets → formatted tables
+- **Robust Chart Embedding**: Validates HTTP 200, buffer size >100 bytes
+- **Fail-Closed Validation**: Checks forbidden terms, truncation, empty sections (NOT source count)
+- **Limited Sources Banner**: Yellow-highlighted notice when vetted sources < 3 (NO HARD FAIL)

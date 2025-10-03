@@ -96,7 +96,7 @@ function normalizeURL(url: string): string {
   return normalized;
 }
 
-// Scoring-based vetting (≥0.6 threshold)
+// Scoring-based vetting (≥0.3 threshold with allowlist auto-pass)
 function scoreSource(url: string, title: string = '', snippet: string = ''): number {
   const lower = url.toLowerCase();
   const text = `${title} ${snippet}`.toLowerCase();
@@ -114,8 +114,12 @@ function scoreSource(url: string, title: string = '', snippet: string = ''): num
   if (lower.includes('museum') || lower.includes('nhm.') || lower.includes('amnh.org')) score += 0.3;
   if (lower.includes('doi.org') || lower.includes('ncbi.nlm.nih.gov')) score += 0.5;
   if (lower.includes('antwiki') || lower.includes('antweb')) score += 0.35;
-  if (lower.includes('britannica.com')) score += 0.25;
-  if (lower.includes('wikipedia.org')) score += 0.2;
+  if (lower.includes('britannica.com')) score += 0.4;
+  if (lower.includes('wikipedia.org')) score += 0.3;
+  if (lower.includes('nationalgeographic.com')) score += 0.4;
+  if (lower.includes('scientificamerican.com')) score += 0.4;
+  if (lower.includes('nature.com')) score += 0.5;
+  if (lower.includes('smithsonian')) score += 0.4;
   
   // Topic match bonus (for biology/ants)
   if (text.match(/\b(ant|formicidae|insect|metamorphosis|larva|pupa|colony)\b/i)) score += 0.15;
@@ -127,8 +131,21 @@ function scoreSource(url: string, title: string = '', snippet: string = ''): num
 }
 
 function isVettedSource(url: string, title: string = '', snippet: string = ''): boolean {
+  const lower = url.toLowerCase();
+  
+  // Blocklist check first
+  if (BLOCKLIST_PATTERNS.some(pattern => lower.includes(pattern))) {
+    return false;
+  }
+  
+  // Allowlist auto-pass (use the defined patterns!)
+  if (ALLOWLIST_PATTERNS.some(pattern => lower.includes(pattern))) {
+    return true;
+  }
+  
+  // Fallback to scoring (lowered threshold to 0.3)
   const score = scoreSource(url, title, snippet);
-  return score >= 0.6;
+  return score >= 0.3;
 }
 
 interface VettedSearchResult {
@@ -340,7 +357,8 @@ class AgentService {
         if (isVetted) {
           vettedUrls.push(url);
         } else {
-          rejectedUrls.push(url);
+          const score = scoreSource(url, title, snippet);
+          rejectedUrls.push(`${url} (score: ${score.toFixed(2)})`);
         }
         
         return isVetted;
@@ -352,10 +370,13 @@ class AgentService {
     const vettedCount = vettedUrls.length;
     const rejectedCount = rejectedUrls.length;
     
-    // Log unique URLs only (avoid duplicates)
+    // Log unique URLs only (avoid duplicates) with detailed diagnostics
     await logger.trace(task.id, `Source vetting: ${vettedCount} vetted, ${rejectedCount} rejected`);
     if (vettedCount > 0) {
-      await logger.trace(task.id, `Vetted sources: ${vettedUrls.slice(0, 5).map(u => u.slice(0, 60)).join(', ')}${vettedCount > 5 ? '...' : ''}`);
+      await logger.trace(task.id, `✓ Vetted: ${vettedUrls.slice(0, 3).map(u => u.slice(0, 50)).join(', ')}${vettedCount > 3 ? ` +${vettedCount - 3} more` : ''}`);
+    }
+    if (rejectedCount > 0 && rejectedCount <= 10) {
+      await logger.trace(task.id, `✗ Rejected: ${rejectedUrls.slice(0, 5).join(' | ')}`);
     }
     
     // Multi-stage fallbacks if insufficient sources
