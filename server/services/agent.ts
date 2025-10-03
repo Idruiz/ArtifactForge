@@ -1010,6 +1010,93 @@ class AgentService {
     return { size: buffer.length };
   }
 
+  // Helper: Save students CSV with data_origin metadata (orchestrator)
+  private async saveStudentsCSV(students: any[], filename: string, dataOrigin: string): Promise<any> {
+    const headers = Object.keys(students[0] || {});
+    const rows = students.map(row => headers.map(h => String(row[h] ?? '')).join(','));
+    const csv = [
+      `# Data Origin: ${dataOrigin}`,
+      headers.join(','),
+      ...rows
+    ].join('\n');
+    
+    const buffer = Buffer.from(csv, 'utf-8');
+    await fileStorage.saveFile(filename, buffer);
+    
+    return { size: buffer.length };
+  }
+
+  // Helper: Build DOCX from LLM-generated sections (orchestrator)
+  private async buildDOCXFromSections(taskId: string, filename: string, sections: any, chartUrls: string[]): Promise<any> {
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import('docx');
+    
+    const children: any[] = [];
+    
+    // Cover
+    if (sections.cover) {
+      children.push(
+        new Paragraph({ text: sections.cover.title, heading: HeadingLevel.TITLE }),
+        new Paragraph({ text: sections.cover.subtitle }),
+        new Paragraph({ text: sections.cover.date || new Date().toISOString().split('T')[0] }),
+        new Paragraph({ text: '' })
+      );
+    }
+    
+    // Executive Summary
+    if (sections.exec_summary) {
+      children.push(
+        new Paragraph({ text: 'Executive Summary', heading: HeadingLevel.HEADING_1 }),
+        new Paragraph({ text: sections.exec_summary }),
+        new Paragraph({ text: '' })
+      );
+    }
+    
+    // Sections
+    for (const section of sections.sections || []) {
+      children.push(
+        new Paragraph({ text: section.heading, heading: HeadingLevel.HEADING_1 }),
+        new Paragraph({ text: section.body })
+      );
+      if (section.bullets) {
+        for (const bullet of section.bullets) {
+          children.push(new Paragraph({ text: `• ${bullet}` }));
+        }
+      }
+      children.push(new Paragraph({ text: '' }));
+    }
+    
+    // Tables
+    for (const table of sections.tables || []) {
+      children.push(
+        new Paragraph({ text: table.caption, heading: HeadingLevel.HEADING_2 }),
+        new Paragraph({ text: `Headers: ${table.headers.join(' | ')}` })
+      );
+      for (const row of table.rows) {
+        children.push(new Paragraph({ text: row.join(' | ') }));
+      }
+      children.push(new Paragraph({ text: '' }));
+    }
+    
+    // Figures (chart URLs as text references for now)
+    if (sections.figures && sections.figures.length > 0) {
+      children.push(new Paragraph({ text: 'Figures', heading: HeadingLevel.HEADING_1 }));
+      for (let i = 0; i < sections.figures.length; i++) {
+        const fig = sections.figures[i];
+        children.push(
+          new Paragraph({ text: `Figure ${i + 1}: ${fig.caption}` }),
+          new Paragraph({ text: `Chart URL: ${chartUrls[i] || 'N/A'}` }),
+          new Paragraph({ text: '' })
+        );
+      }
+    }
+    
+    const doc = new Document({ sections: [{ children }] });
+    const buffer = await Packer.toBuffer(doc);
+    await fileStorage.saveFile(filename, buffer);
+    
+    return { size: buffer.length };
+  }
+
   /* ------------------------------- helpers ------------------------------- */
 
   private detectRequestedFormats(prompt: string): BuilderFormat[] {

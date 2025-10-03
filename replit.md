@@ -62,6 +62,35 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (October 3, 2025)
 
+### ORCHESTRATOR-DRIVEN PROMPTS: No Hardcoding (Latest)
+**Problem**: Prompts were hardcoded with example data, causing the system to embed sample text in templates
+**Solution**: Implemented adaptive, schema-driven prompt orchestrator that builds prompts dynamically from runtime data
+
+**RequestNormalizer Adapter**:
+- Converts any input (JSON or text) → validated orchestrator schema
+- Routes to DATA_ANALYSIS_DOCX or RESEARCH_REPORT_DOCX automatically
+- Tags data origin: `user-provided-json`, `synthetic-from-prompt`, or `topic-from-prompt`
+- Logs normalization decisions for transparency
+
+**Orchestrator Prompt Builders**:
+- `buildSystemMessage()`: Role, constraints, QA gates (no user data)
+- `buildUserMessage()`: Task instruction + structured JSON (exact data, no paraphrasing)
+- `buildDeveloperMessage()`: Output contract for DOCX builder (sections, figures, tables)
+- **Zero hardcoded example data** - all content pulled from runtime payload
+
+**DATA_ANALYSIS_DOCX Pipeline (Orchestrator-driven)**:
+1. **O1**: Normalize input → structured students[] + class_averages
+2. **O2**: Build orchestrator prompts → call generateDOCXSections
+3. **O3**: LLM returns sections with exec_summary, methods, results, figures, tables
+4. **O4**: Generate chart PNGs from LLM figure specs (QuickChart.io)
+5. **O5**: Build DOCX from LLM sections (not templates)
+6. **O6**: Save CSV with `dataOrigin` metadata, emit artifacts
+
+**Metadata Tracking**:
+- CSV files tagged with `dataOrigin` (synthetic vs real)
+- Artifacts include `dataOrigin`, student count, section count
+- Logs show normalization, data source, prompt sizes
+
 ### PIPELINE SEPARATION: DATA_ANALYSIS vs RESEARCH_REPORT
 **Problem**: Different job types (data analysis vs research reports) were using the same template path
 **Solution**: Intent router detects pipeline type and routes to appropriate specialized pipeline
