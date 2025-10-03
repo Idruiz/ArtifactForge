@@ -1,0 +1,293 @@
+I’m giving you (A) a no-wiggle directive to paste into Replit’s Agent, and (B) a drop-in Prompt Orchestrator (TypeScript) that builds the right prompt for any dataset without hardcoding your sample text.
+
+A) Paste-this directive (stops hardcoding; enforces adaptive, schema-driven prompts)
+TITLE: DO NOT HARDCODE USER PROMPTS — BUILD ADAPTIVE, SCHEMA-DRIVEN PROMPTS AND CALL THE API WITH DYNAMIC INPUTS
+
+READ FIRST — NON-NEGOTIABLE
+You must never paste the user’s example prompt as a fixed string inside code or templates. You must:
+1) Parse user input into a validated JSON structure (schema below).
+2) Route to the correct pipeline: DATA_ANALYSIS_DOCX vs RESEARCH_REPORT_DOCX.
+3) Construct system + user messages dynamically from the parsed JSON.
+4) Include the raw structured data (JSON) in the message for grounding (no rewording/handwave).
+5) Run validation gates; if something’s missing, ask the model to compute only what’s possible (don’t fabricate).
+
+INTENT ROUTER (RULES > GUESS)
+- DATA_ANALYSIS_DOCX if there are per-student metrics, per-record numbers, thresholds, or explicit “analyze” wording.
+- RESEARCH_REPORT_DOCX if it’s a topic with no per-record metrics (e.g., “life cycle of ants”).
+Log: router.intent, router.reason.
+
+INPUT SCHEMAS (STRICT)
+DATA_ANALYSIS_DOCX schema:
+{
+  "students": [
+    {
+      "name": "string",
+      "test_pct": 0..100,
+      "term_pct": 0..100,
+      "attendance_pct": 0..100,
+      "missing_tasks": 0..999,
+      "engagement_5": 1..5,
+      "growth_pct": -100..100,
+      "notes": "string"
+    }
+  ],
+  "class_averages": {
+    "test_pct": 0..100,
+    "term_pct": 0..100,
+    "attendance_pct": 0..100,
+    "missing_tasks_per_student": 0..999,
+    "engagement_mean_5": 1..5
+  }
+}
+
+RESEARCH_REPORT_DOCX schema:
+{
+  "topic": "string",
+  "constraints": ["array of hints (optional)"],
+  "min_sources": 10,
+  "allow_domains": ["*.edu","*.gov","*.ac.*","antwiki.org","antweb.org","ncbi.nlm.nih.gov/pmc","doi.org/*","*.si.edu","*.nhm.ac.uk","*.amnh.org"],
+  "block_domains": ["studocu.com","scribd.com","misfitanimals.com","essay/AI generator sites","calculator/tutorial sites"],
+  "figure_requirements": ["timeline","caste diagram","optional: temp vs development schematic"],
+  "sections_required": ["cover","exec_summary","introduction","biology","colony","tables","figures","discussion","references"]
+}
+
+PROMPT CONSTRUCTION (ADAPTIVE)
+- Build a System message describing the role, constraints, and QA gates. No user data hardcoded.
+- Build a User message that contains ONLY (a) a brief task instruction and (b) the structured JSON input (students or report spec) as a fenced JSON block. No English paraphrase of the numbers.
+- Add a short Developer/Tool message (or additional system content) that specifies exact output contract for the DOCX builder (sections, figures count, tables), and rejection rules (no placeholders, no “this slide”, etc).
+
+ABSOLUTE RULES
+- Never embed a specific example’s names or numbers in the prompt templates. Always take them from the parsed JSON.
+- If `students[]` is provided, do NOT synthesize a dataset. Compute on provided records; label “partial cohort” if fewer than claimed.
+- Figures must be produced as real PNGs (server-side) and embedded; zero placeholders or raw chart URLs.
+- QA gates fail-closed only on real issues (missing figures/tables/sections), not on “<10 sources” or brittle vetting thresholds. Sources gathering loops until the target is met.
+
+LOGGING
+- Log router.intent, parsed schema, counts, figure files emitted, QA results.
+- Save the exact messages sent to the API (with data), minus secrets.
+
+ACCEPTANCE (DO THIS BEFORE “FIXED”)
+- Show the constructed System/User/Developer messages (sanitized of keys) for this run.
+- Attach the DOCX and artifacts.
+- Paste first ~250 words of the Executive Summary produced from THIS dataset (not an example).
+
+Fail conditions: any hardcoded prompt content referencing a previous example, placeholders in DOCX, “will include/slide/template” leakage, synthetic data used when students[] is provided, or missing figures/tables.
+
+B) Drop-in Prompt Orchestrator (TypeScript, no hardcoding)
+
+Put this in src/prompt/orchestrator.ts. It routes intent, validates input, and builds dynamic prompts for OpenAI (or your LLM). No sample names or numbers are baked in—everything is pulled from runtime payload.
+
+// src/prompt/orchestrator.ts
+// Drop-in adaptive prompt builder. No hardcoded sample data.
+// Node 18+, TypeScript. Adjust imports to your HTTP/LLM client.
+
+type Student = {
+  name: string;
+  test_pct: number;
+  term_pct: number;
+  attendance_pct: number;
+  missing_tasks: number;
+  engagement_5: number;
+  growth_pct: number;
+  notes?: string;
+};
+
+type ClassAverages = {
+  test_pct: number;
+  term_pct: number;
+  attendance_pct: number;
+  missing_tasks_per_student: number;
+  engagement_mean_5: number;
+};
+
+type DataAnalysisInput = {
+  students: Student[];
+  class_averages?: ClassAverages;
+};
+
+type ResearchReportInput = {
+  topic: string;
+  constraints?: string[];
+  min_sources?: number;
+  allow_domains?: string[];
+  block_domains?: string[];
+  figure_requirements?: string[];
+  sections_required?: string[];
+};
+
+type RouterResult =
+  | { intent: "DATA_ANALYSIS_DOCX"; reason: string; data: DataAnalysisInput }
+  | { intent: "RESEARCH_REPORT_DOCX"; reason: string; data: ResearchReportInput };
+
+export function routeIntent(raw: unknown): RouterResult {
+  const txt = JSON.stringify(raw ?? "").toLowerCase();
+  const hasStudents =
+    /"students"\s*:/.test(txt) ||
+    /\b(test|term|attendance|engagement|missing|growth)\b/.test(txt);
+  const hasTopicOnly = /"topic"\s*:/.test(txt) && !hasStudents;
+
+  if (hasStudents) {
+    const data = validateDataAnalysisInput(raw);
+    return { intent: "DATA_ANALYSIS_DOCX", reason: "Found per-student metrics", data };
+  }
+  if (hasTopicOnly) {
+    const data = validateResearchReportInput(raw);
+    return { intent: "RESEARCH_REPORT_DOCX", reason: "Topic with no per-student metrics", data };
+  }
+  // Default: prefer analysis if numbers present, else research
+  const hasNumbers = /\b\d+(\.\d+)?%?/.test(txt);
+  if (hasNumbers) {
+    const data = validateDataAnalysisInput(raw);
+    return { intent: "DATA_ANALYSIS_DOCX", reason: "Numeric cues detected", data };
+  }
+  const data = validateResearchReportInput({ topic: String(raw || "General topic") });
+  return { intent: "RESEARCH_REPORT_DOCX", reason: "Fallback topic", data };
+}
+
+function clamp(n: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function validateDataAnalysisInput(raw: any): DataAnalysisInput {
+  if (!raw || !raw.students) throw new Error("DATA_ANALYSIS_DOCX requires { students: [...] }");
+  const students: Student[] = (raw.students as any[]).map((s, i) => {
+    if (!s || typeof s.name !== "string") throw new Error(`students[${i}].name required`);
+    const num = (k: string, lo: number, hi: number) => {
+      const v = Number(s[k]); if (!Number.isFinite(v)) throw new Error(`students[${i}].${k} numeric required`);
+      return clamp(v, lo, hi);
+    };
+    return {
+      name: s.name,
+      test_pct: num("test_pct", 0, 100),
+      term_pct: num("term_pct", 0, 100),
+      attendance_pct: num("attendance_pct", 0, 100),
+      missing_tasks: clamp(Number(s.missing_tasks ?? 0), 0, 999),
+      engagement_5: clamp(Number(s.engagement_5 ?? 3), 1, 5),
+      growth_pct: clamp(Number(s.growth_pct ?? 0), -100, 100),
+      notes: String(s.notes ?? "").slice(0, 400),
+    };
+  });
+  const ca = raw.class_averages ? {
+    test_pct: clamp(Number(raw.class_averages.test_pct ?? 0), 0, 100),
+    term_pct: clamp(Number(raw.class_averages.term_pct ?? 0), 0, 100),
+    attendance_pct: clamp(Number(raw.class_averages.attendance_pct ?? 0), 0, 100),
+    missing_tasks_per_student: clamp(Number(raw.class_averages.missing_tasks_per_student ?? 0), 0, 999),
+    engagement_mean_5: clamp(Number(raw.class_averages.engagement_mean_5 ?? 3), 1, 5),
+  } : undefined;
+  return { students, class_averages: ca };
+}
+
+function validateResearchReportInput(raw: any): ResearchReportInput {
+  if (!raw || !raw.topic) throw new Error("RESEARCH_REPORT_DOCX requires { topic }");
+  return {
+    topic: String(raw.topic),
+    constraints: raw.constraints ?? [],
+    min_sources: Number(raw.min_sources ?? 10),
+    allow_domains: raw.allow_domains ?? ["*.edu","*.gov","*.ac.*","antwiki.org","antweb.org","ncbi.nlm.nih.gov/pmc","doi.org/*","*.si.edu","*.nhm.ac.uk","*.amnh.org"],
+    block_domains: raw.block_domains ?? ["studocu.com","scribd.com","misfitanimals.com","essay","ai report generator","calculator","tutorial"],
+    figure_requirements: raw.figure_requirements ?? ["timeline","caste diagram","optional: temperature vs development schematic"],
+    sections_required: raw.sections_required ?? ["cover","exec_summary","introduction","biology","colony","tables","figures","discussion","references"],
+  };
+}
+
+// ---------- Prompt builders (no hardcoded example data) ----------
+
+export function buildSystemMessage(intent: RouterResult["intent"]): string {
+  if (intent === "DATA_ANALYSIS_DOCX") {
+    return [
+      "You are an assessment analyst. Produce a finished DOCX with embedded PNG figures and tables.",
+      "No placeholders, no 'this slide will'. Compute on provided students; do not synthesize data when students[] is present.",
+      "Fail-closed if figures/tables/sections missing; otherwise proceed.",
+      "Ban leakage: words like 'slide', 'template', 'will include' must not appear.",
+    ].join(" ");
+  }
+  return [
+    "You are a science writer. Produce a finished research DOCX with embedded PNG figures and a vetted reference list (≥10).",
+    "No placeholders or meta text. Include in-text citations [Author, Year] resolving to references.",
+    "If sources scarce, iterate queries; do not proceed until min_sources reached.",
+  ].join(" ");
+}
+
+export function buildUserMessage(intent: RouterResult["intent"], data: DataAnalysisInput | ResearchReportInput): string {
+  if (intent === "DATA_ANALYSIS_DOCX") {
+    const payload = JSON.stringify(data, null, 2);
+    return [
+      "Create a Class Performance Analysis DOCX with: Cover, Executive Summary (200–300 words), Methods (data source=this JSON), Results (≥500 words), Recommendations (class + per-student), Limitations, Appendix (CSV).",
+      "Embed ≥4 PNG figures (bar charts, scatter, missing-tasks) and 2 tables (per-student; cohort summary).",
+      "Use only the JSON below. Do not fabricate or generalize beyond it. If fewer students than expected, label as partial.",
+      "JSON:",
+      "```json",
+      payload,
+      "```"
+    ].join("\n");
+  }
+  const payload = JSON.stringify(data, null, 2);
+  return [
+    "Write a Research DOCX on the topic below with: Cover, Executive Summary (250–400 words), Introduction (≥600), Biology & Colony sections, ≥3 embedded PNG figures (timeline, caste diagram, optional schematic), ≥1 table of stage ranges, Discussion (≥600), References (≥10, vetted).",
+    "Follow allow/block domain rules in the JSON; iterate search until min_sources met; include [Author, Year] citations.",
+    "JSON:",
+    "```json",
+    payload,
+    "```"
+  ].join("\n");
+}
+
+export function buildDeveloperMessage(intent: RouterResult["intent"]): string {
+  if (intent === "DATA_ANALYSIS_DOCX") {
+    return [
+      "OUTPUT CONTRACT:",
+      "- Return structured sections ready for DOCX: cover, exec_summary, methods, results, recommendations, limitations, appendix.",
+      "- Produce figure specs with captions+alt text and base64 PNGs for embedding.",
+      "- Produce two tables in Markdown that we will convert to DOCX tables.",
+      "QA GATES: reject if any figure/table missing; reject if meta words present.",
+    ].join("\n");
+  }
+  return [
+    "OUTPUT CONTRACT:",
+    "- Sections: cover, exec_summary, introduction, biology, colony, tables, figures, discussion, references.",
+    "- Provide figure specs with captions+alt text and base64 PNGs.",
+    "- Provide references with full metadata (title, authors, year, venue, DOI/PMCID/URL).",
+    "QA GATES: reject if < min_sources, or any figure/table missing, or meta words present.",
+  ].join("\n");
+}
+
+Example usage (the exact dataset you gave)
+import { routeIntent, buildSystemMessage, buildUserMessage, buildDeveloperMessage } from "./src/prompt/orchestrator";
+
+// Build input at runtime (e.g., parsed from your UI)
+const input = {
+  students: [
+    { name:"Ava R.",   test_pct:92, term_pct:88, attendance_pct:98, missing_tasks:0, engagement_5:4, growth_pct:6, notes:"strong reading/listening; needs freer speaking" },
+    { name:"Liam T.",  test_pct:78, term_pct:74, attendance_pct:92, missing_tasks:3, engagement_5:3, growth_pct:2, notes:"solid vocab; weak verb accuracy (pret vs imperf)" },
+    { name:"Sofia M.", test_pct:85, term_pct:81, attendance_pct:96, missing_tasks:1, engagement_5:5, growth_pct:5, notes:"enthusiastic; slips on accent marks" },
+    { name:"Noah P.",  test_pct:68, term_pct:70, attendance_pct:88, missing_tasks:5, engagement_5:2, growth_pct:-1, notes:"avoids speaking; benefits from sentence frames" },
+    { name:"Maya C.",  test_pct:90, term_pct:91, attendance_pct:99, missing_tasks:0, engagement_5:4, growth_pct:4, notes:"strongest writer; needs faster listening decoding" },
+  ],
+  class_averages: {
+    test_pct:82.6, term_pct:80.8, attendance_pct:94.6,
+    missing_tasks_per_student:1.8, engagement_mean_5:3.6
+  }
+};
+
+const r = routeIntent(input);
+const system = buildSystemMessage(r.intent);
+const user = buildUserMessage(r.intent, r.data);
+const dev = buildDeveloperMessage(r.intent);
+
+// Send {system, user, dev} to your LLM API call.
+// Then take the returned figure base64, tables, and sections and write the DOCX + PNGs.
+// No hardcoded example text appears in any template—only runtime JSON.
+
+What this gives you (and why the agent can’t screw it up now)
+
+No hardcoding: The orchestrator never embeds your sample names/numbers; it pulls whatever JSON you pass in.
+
+Correct routing: Data → analysis pipeline; topics → research pipeline.
+
+Grounded prompts: The exact JSON is included in the user message; the model can’t “forget” the numbers.
+
+QA gates baked in: If figures/tables are missing or meta text leaks, the run fails before export (the right failure).
+
+Loggable & testable: You can print the messages being sent to the API to prove it used your data, not a canned prompt.
+
+Want me to add the tiny charting + python-docx embed module next so it turns the model’s figure specs into actual PNGs + DOCX tables instantly? I’ll drop a ready-to-run charts.ts + docx.ts pair you can paste in.
