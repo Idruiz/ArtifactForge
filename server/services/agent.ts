@@ -302,7 +302,64 @@ class AgentService {
 
   /* --------------------------- Content pipeline --------------------------- */
 
+  private detectPipelineIntent(prompt: string): { intent: 'DATA_ANALYSIS' | 'RESEARCH_REPORT', reason: string } {
+    const p = prompt.toLowerCase();
+    
+    // DATA_ANALYSIS triggers - metrics, counts, thresholds, performance analysis
+    const dataKeywords = [
+      'analyze', 'analysis', 'metrics', 'performance', 'count', 'threshold',
+      'average', 'below', 'above', 'students', 'skills', 'chart', 'dashboard',
+      'create insights', 'generate insights', 'statistics', 'data', 'trends'
+    ];
+    
+    // Check for numeric data patterns like "20 students, 5 below..."
+    const hasNumericData = /\d+\s*(students|people|users|items|records|below|above)/.test(p);
+    
+    // Check for data analysis keywords
+    const dataMatches = dataKeywords.filter(k => p.includes(k));
+    
+    // RESEARCH_REPORT triggers - topic-based, no metrics
+    const researchKeywords = [
+      'life cycle', 'history of', 'what is', 'how does', 'comparative',
+      'evolution of', 'overview of', 'introduction to', 'biology of',
+      'theory of', 'concept of', 'study of', 'research on'
+    ];
+    
+    const researchMatches = researchKeywords.filter(k => p.includes(k));
+    
+    // Decision logic: DATA_ANALYSIS when numbers/metrics present
+    if (hasNumericData || (dataMatches.length >= 2 && !researchMatches.length)) {
+      return {
+        intent: 'DATA_ANALYSIS',
+        reason: `Detected ${hasNumericData ? 'numeric data patterns' : `data keywords: ${dataMatches.join(', ')}`}`
+      };
+    }
+    
+    // Default to RESEARCH_REPORT for topic-based queries
+    return {
+      intent: 'RESEARCH_REPORT',
+      reason: researchMatches.length > 0 
+        ? `Detected research keywords: ${researchMatches.join(', ')}`
+        : 'Topic-based query without metrics'
+    };
+  }
+
   private async processContentGeneration(task: AgentTask) {
+    // INTENT ROUTER - determine pipeline
+    const router = this.detectPipelineIntent(task.prompt);
+    await logger.trace(task.id, `PIPELINE ROUTER: ${router.intent} (${router.reason})`);
+    
+    // Route to appropriate pipeline
+    if (router.intent === 'DATA_ANALYSIS') {
+      return await this.processDataAnalysis(task);
+    } else {
+      return await this.processResearchReport(task);
+    }
+  }
+
+  /* --------------------------- RESEARCH REPORT PIPELINE --------------------------- */
+  
+  private async processResearchReport(task: AgentTask) {
     // Decide what to produce (heuristics from prompt; defaults to pptx)
     const formats = this.detectRequestedFormats(task.prompt);
 
