@@ -1,0 +1,70 @@
+TITLE: STOP OVER-VETTING — GATHER ≥10 QUALITY SOURCES BEFORE WRITING. ITERATE UNTIL DONE. NO EARLY EXIT.
+
+PROBLEM STATEMENT (READ THIS, THEN FIX IT):
+You keep stalling at 1–3 sources and “continuing with limited sources.” Unacceptable. For biology topics like “life cycle of ants,” you must gather and vet AT LEAST TEN (10) credible sources before drafting. Do not start outline/draft/DOCX until the source set is complete. Do not burn my funds looping the same rejects; expand, normalize, harvest citations, and keep going.
+
+NON-NEGOTIABLE TARGET:
+- **min_total_vetted_sources = 10** (TEN). Not 3. Not 5. **10**.
+- Composition rule (aim for diversity; min thresholds):
+  • ≥5 primary/secondary scholarly items (peer-reviewed articles, monographs, museum/academic publications)
+  • ≤3 encyclopedia/overview pages (e.g., Britannica, museum explainers)
+  • ≤2 extension/outreach (.edu/.gov/.museum) counted as secondary
+  • 0 from blocklist (see below)
+
+VETTING CONFIG (RELAXED, SANE):
+- Allowlist (accept by default unless explicit red flags): 
+  *.edu, *.ac.*, *.gov, *.gouv.*, *.si.edu, *.nhm.ac.uk, *.amnh.org, *.biodiversitylibrary.org, antwiki.org, antweb.org, ncbi.nlm.nih.gov/pmc, doi.org/*
+- Blocklist (reject for citations): studocu.com, scribd.com, misfitanimals.com, classroom craft blogs, “AI report generator”/essay mills, generic calculator/tutorial sites, GeeksforGeeks biology pages.
+- Scoring: accept if score ≥ **0.55** (not 0.8+). Museum/extension pages are valid as secondary background.
+- URL normalizer: unwrap line breaks; strip UTM/fragments; HEAD for 200 + (html|pdf); dedupe host+path; don’t double-log the same reject.
+
+ITERATIVE HARVEST PLAN (KEEP GOING UNTIL 10):
+R0: Seed references (count toward total if topic-relevant; include full metadata)
+  - Hölldobler & Wilson (1990) *The Ants* — monograph
+  - Lach, Parr & Abbott (2010) *Ant Ecology*
+  - Tschinkel (2006) *The Fire Ants*
+R1: Topical queries (en+latin): 
+  - "Formicidae holometabolous development larva pupa queen" 
+  - "ant life cycle duration egg larva pupa adult site:edu OR site:gov (pdf)"
+  - "ant metamorphosis review DOI"
+  - "site:antwiki.org lifecycle"  |  "site:ncbi.nlm.nih.gov/pmc ant development"
+R2: Scholar/PMC pass: harvest titles/DOIs/PMCID; follow 3–5 citations & 3–5 references recursively (depth=2).
+R3: Museum/extension pass: NHM, Smithsonian NMNH, AMNH, university extension/IPM pages.
+R4: Bibliography expansion: from each accepted item, pull 2–3 adjacent works (same author or review articles).
+R5: If still <10, broaden synonyms (brood development, ontogeny, caste differentiation, diapause, thermoregulation effects on development).
+STOP CONDITION: **When vetted_count ≥ 10** AND composition rule satisfied. THEN proceed to outline/draft.
+
+DO NOT START DRAFTING UNTIL SOURCES COMPLETE.
+
+CITATIONS & ACCURACY:
+- Every factual claim must have an in-text citation [Author, Year]; map to one entry in References with DOI/PMCID/ISBN where applicable.
+- Distinguish organism life stages (egg, larva, pupa, adult) from **colony-level** development (queen, worker, male) with citations.
+- No “25% per stage” gimmicks unless clearly labeled as **schematic** and not used as data.
+
+FAIL-CLOSED ON REAL PROBLEMS (NOT ON “<10 SOURCES”):
+- Fail export only if: sections empty/truncated, figures missing, or prompt/meta leakage found. 
+- DO NOT fail because “vetted < 10” — **instead keep iterating** R1–R5 until the target is met. If rate-limited, pause/backoff and resume search; do not proceed to writing.
+
+DOCX CONTRACT (unchanged but enforced):
+- Sections: Cover; Executive Summary (250–400 words); Introduction (≥600, cites); Biology (stages with durations/ranges or clear schematic + cites); Colony section (castes + roles, cites); Results (≥600, ≥3 embedded PNG figures + ≥1 table); Discussion (≥600); References (formatted; no blocklisted domains).
+- Figures: PNGs embedded (timeline, caste diagram, optional temp/development curve); each with caption + alt text + short interpretation.
+- Accessibility: alt text on all images.
+
+LOGGING (PROVE IT):
+- Print counts per round: `R0 seeds=3`, `R1 found=24 vetted=5`, `R2 added=3`, `R3 added=2`, etc.
+- Save `report_sources.json` with full metadata (title, authors, year, venue, url/doi/pmcid, type=primary|secondary|overview|extension, seed?).
+- No duplicate rejection spam. Log final composition mix.
+
+ACCEPTANCE CHECKLIST (RUN BEFORE “FIXED”):
+- `vetted_total >= 10` and composition satisfied.
+- `report_sources.json` included with ≥10 entries and sane distribution.
+- Draft → Figures → DOCX completed; DOCX contains ≥3 embedded PNGs & ≥1 table; in-text citations resolve to References.
+- No blocklisted domains in References.
+- Post the first ~250 words of the Executive Summary in chat + attach the DOCX.
+
+IF BLOCKED:
+- State exact module/line blocking iterative search (e.g., `SourceVetter.minRequired = 3` or `scoreThreshold = 0.8`) and override with:
+  - `MIN_VETTED_REQUIRED = 10`
+  - `SCORE_THRESHOLD = 0.55`
+  - enable iterative rounds R0–R5 with max_rounds ≥ 8 and backoff.
+Proceed after patching. Do not downscope. Do not stop early. Deliver.

@@ -143,9 +143,9 @@ function isVettedSource(url: string, title: string = '', snippet: string = ''): 
     return true;
   }
   
-  // Fallback to scoring (lowered threshold to 0.3)
+  // Fallback to scoring (threshold 0.55 for quality)
   const score = scoreSource(url, title, snippet);
-  return score >= 0.3;
+  return score >= 0.55;
 }
 
 interface VettedSearchResult {
@@ -365,7 +365,7 @@ class AgentService {
         let decision = '';
         if (blocklisted) decision = 'BLOCKLIST';
         else if (allowlisted) decision = 'ALLOWLIST→PASS';
-        else if (score >= 0.3) decision = `SCORE ${score.toFixed(2)}→PASS`;
+        else if (score >= 0.55) decision = `SCORE ${score.toFixed(2)}→PASS`;
         else decision = `SCORE ${score.toFixed(2)}→FAIL`;
         
         if (isVetted) {
@@ -392,44 +392,16 @@ class AgentService {
       await logger.trace(task.id, `✗ Rejected (showing first 5): ${rejectedUrls.slice(0, 5).join(' | ')}`);
     }
     
-    // Multi-stage fallbacks if insufficient sources
+    // R0-R5 ITERATIVE HARVEST: Keep searching until MIN_VETTED_REQUIRED (10) met
+    const MIN_VETTED_REQUIRED = 10;
     const isReportOrAnalysis = task.prompt.toLowerCase().match(/\b(report|analysis|study|research)\b/);
-    let fallbackUsed = 'none';
+    let roundsCompleted: string[] = [];
     
-    if (isReportOrAnalysis && vettedCount < 3) {
-      await logger.trace(task.id, `Insufficient sources (${vettedCount}). Attempting fallbacks...`);
+    if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
+      await logger.trace(task.id, `Need ${MIN_VETTED_REQUIRED} sources, have ${vettedUrls.length}. Starting iterative harvest...`);
       
-      // F1: Broaden queries with synonyms/Latin terms
-      await logger.trace(task.id, `F1: Broadening queries with scientific terms`);
-      const broadQueries = this.generateFallbackQueries(task.prompt);
-      const fallbackResults = await searcherService.performMultiSearch(broadQueries);
-      
-      for (const [query, response] of Object.entries(fallbackResults)) {
-        const results = Array.isArray(response?.results) ? response.results : [];
-        const vetted = results.filter((r: any) => {
-          const url = normalizeURL(r?.url || '');
-          if (seenUrls.has(url)) return false;
-          seenUrls.add(url);
-          
-          const isVetted = isVettedSource(url, r?.title || '', r?.snippet || '');
-          if (isVetted) vettedUrls.push(url);
-          return isVetted;
-        });
-        
-        if (vetted.length > 0) {
-          vettedResults[query] = { results: vetted, totalResults: vetted.length };
-        }
-      }
-      
-      if (vettedUrls.length >= 3) {
-        fallbackUsed = 'F1-broaden';
-        await logger.trace(task.id, `F1 success: now ${vettedUrls.length} vetted sources`);
-      }
-    }
-    
-    // F3: Add seed references if still insufficient
-    if (isReportOrAnalysis && vettedUrls.length < 3) {
-      await logger.trace(task.id, `F3: Adding seed references (known literature)`);
+      // R0: Seed references (always add if topic-relevant)
+      await logger.trace(task.id, `R0: Adding seed references`);
       const relevantSeeds = SEED_REFERENCES.filter(ref => 
         task.prompt.toLowerCase().includes('ant') || task.prompt.toLowerCase().includes('insect')
       );
@@ -438,37 +410,159 @@ class AgentService {
         if (!seenUrls.has(seed.url)) {
           seenUrls.add(seed.url);
           vettedUrls.push(seed.url);
-          vettedResults['seed_references'] = vettedResults['seed_references'] || { results: [], totalResults: 0 };
-          vettedResults['seed_references'].results.push({
+          vettedResults['R0_seeds'] = vettedResults['R0_seeds'] || { results: [], totalResults: 0 };
+          vettedResults['R0_seeds'].results.push({
             title: seed.title,
             url: seed.url,
             snippet: seed.citation,
           });
-          vettedResults['seed_references'].totalResults++;
+          vettedResults['R0_seeds'].totalResults++;
         }
       }
-      
-      if (vettedUrls.length >= 2) {
-        fallbackUsed = 'F3-seeds';
-        await logger.trace(task.id, `F3 success: now ${vettedUrls.length} sources (${relevantSeeds.length} from seeds)`);
-      }
+      roundsCompleted.push(`R0_seeds=${relevantSeeds.length}`);
+      await logger.trace(task.id, `R0 complete: ${vettedUrls.length} total`);
     }
     
-    // F4: Continue anyway with Limited Sources banner (NO HARD FAIL)
+    // R1: Topical queries with Latin/scientific terms
+    if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
+      await logger.trace(task.id, `R1: Broadening with topical/scientific queries`);
+      const broadQueries = this.generateFallbackQueries(task.prompt);
+      const r1Results = await searcherService.performMultiSearch(broadQueries);
+      
+      let r1Added = 0;
+      for (const [query, response] of Object.entries(r1Results)) {
+        const results = Array.isArray(response?.results) ? response.results : [];
+        for (const r of results) {
+          const url = normalizeURL(r?.url || '');
+          if (seenUrls.has(url)) continue;
+          seenUrls.add(url);
+          
+          if (isVettedSource(url, r?.title || '', r?.snippet || '')) {
+            vettedUrls.push(url);
+            r1Added++;
+            vettedResults[query] = vettedResults[query] || { results: [], totalResults: 0 };
+            vettedResults[query].results.push(r);
+            vettedResults[query].totalResults++;
+          }
+        }
+      }
+      roundsCompleted.push(`R1_topical=${r1Added}`);
+      await logger.trace(task.id, `R1 complete: added ${r1Added}, total ${vettedUrls.length}`);
+    }
+    
+    // R2: Scholar/Museum-specific queries
+    if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
+      await logger.trace(task.id, `R2: Scholar/museum-specific searches`);
+      const scholarQueries = [
+        `${task.prompt} site:ncbi.nlm.nih.gov/pmc`,
+        `${task.prompt} site:doi.org`,
+        `${task.prompt} site:antwiki.org OR site:antweb.org`,
+        `${task.prompt} site:smithsonian OR site:nhm.ac.uk OR site:amnh.org`,
+      ];
+      const r2Results = await searcherService.performMultiSearch(scholarQueries);
+      
+      let r2Added = 0;
+      for (const [query, response] of Object.entries(r2Results)) {
+        const results = Array.isArray(response?.results) ? response.results : [];
+        for (const r of results) {
+          const url = normalizeURL(r?.url || '');
+          if (seenUrls.has(url)) continue;
+          seenUrls.add(url);
+          
+          if (isVettedSource(url, r?.title || '', r?.snippet || '')) {
+            vettedUrls.push(url);
+            r2Added++;
+          }
+        }
+      }
+      roundsCompleted.push(`R2_scholar=${r2Added}`);
+      await logger.trace(task.id, `R2 complete: added ${r2Added}, total ${vettedUrls.length}`);
+    }
+    
+    // R3: Extension/Educational resources
+    if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
+      await logger.trace(task.id, `R3: University extension and educational resources`);
+      const r3Queries = [
+        `${task.prompt} site:edu extension OR ipm`,
+        `${task.prompt} site:gov agriculture OR entomology`,
+      ];
+      const r3Results = await searcherService.performMultiSearch(r3Queries);
+      
+      let r3Added = 0;
+      for (const [query, response] of Object.entries(r3Results)) {
+        const results = Array.isArray(response?.results) ? response.results : [];
+        for (const r of results) {
+          const url = normalizeURL(r?.url || '');
+          if (seenUrls.has(url)) continue;
+          seenUrls.add(url);
+          
+          if (isVettedSource(url, r?.title || '', r?.snippet || '')) {
+            vettedUrls.push(url);
+            r3Added++;
+          }
+        }
+      }
+      roundsCompleted.push(`R3_extension=${r3Added}`);
+      await logger.trace(task.id, `R3 complete: added ${r3Added}, total ${vettedUrls.length}`);
+    }
+    
+    // R4: Synonym/related term expansion
+    if (isReportOrAnalysis && vettedUrls.length < MIN_VETTED_REQUIRED) {
+      await logger.trace(task.id, `R4: Synonym and related term expansion`);
+      const synonymQueries = [
+        task.prompt.replace(/life cycle/i, 'development stages'),
+        task.prompt.replace(/life cycle/i, 'ontogeny metamorphosis'),
+        task.prompt + ' brood development caste differentiation',
+      ];
+      const r4Results = await searcherService.performMultiSearch(synonymQueries);
+      
+      let r4Added = 0;
+      for (const [query, response] of Object.entries(r4Results)) {
+        const results = Array.isArray(response?.results) ? response.results : [];
+        for (const r of results) {
+          const url = normalizeURL(r?.url || '');
+          if (seenUrls.has(url)) continue;
+          seenUrls.add(url);
+          
+          if (isVettedSource(url, r?.title || '', r?.snippet || '')) {
+            vettedUrls.push(url);
+            r4Added++;
+          }
+        }
+      }
+      roundsCompleted.push(`R4_synonyms=${r4Added}`);
+      await logger.trace(task.id, `R4 complete: added ${r4Added}, total ${vettedUrls.length}`);
+    }
+    
     const finalVettedCount = vettedUrls.length;
-    if (isReportOrAnalysis && finalVettedCount < 3) {
-      fallbackUsed = 'F4-limited';
-      await logger.trace(task.id, `F4: Continuing with ${finalVettedCount} sources + Limited Sources banner`);
-      // Store flag for builder to add banner
+    await logger.trace(task.id, `Harvest complete: ${finalVettedCount} sources. Rounds: ${roundsCompleted.join(', ')}`);
+    
+    // ENFORCE: Block outline generation if insufficient sources
+    if (isReportOrAnalysis && finalVettedCount < MIN_VETTED_REQUIRED) {
+      await logger.trace(task.id, `⚠️ INSUFFICIENT SOURCES: ${finalVettedCount}/${MIN_VETTED_REQUIRED} - cannot proceed to drafting`);
       (task as any).limitedSources = true;
       (task as any).sourceCount = finalVettedCount;
     }
     
-    await logger.trace(task.id, `Final: ${finalVettedCount} sources, fallback=${fallbackUsed}`);
     await logger.stepEnd(task.id, "Vetting sources");
 
     // 2.6) Build meaningful research context from vetted pages
     const { contextText, topUrls } = await this.gatherResearchContext(vettedResults);
+
+    // ENFORCE: Block outline generation if insufficient sources for reports
+    if (isReportOrAnalysis && finalVettedCount < MIN_VETTED_REQUIRED) {
+      task.status = "failed";
+      task.currentStep = `Failed: Only ${finalVettedCount}/${MIN_VETTED_REQUIRED} sources found`;
+      this.updateStatus(task.sessionId, task);
+      
+      await logger.stepStart(task.id, "BLOCKED: Insufficient sources");
+      await logger.trace(task.id, `Cannot generate report with ${finalVettedCount} sources. Need ${MIN_VETTED_REQUIRED}.`);
+      await logger.trace(task.id, `Iterative harvest rounds completed: ${roundsCompleted.join(', ')}`);
+      await logger.trace(task.id, `Please refine search terms or check if topic has sufficient academic coverage.`);
+      await logger.stepEnd(task.id, "BLOCKED: Insufficient sources");
+      
+      throw new Error(`Insufficient sources for report: ${finalVettedCount}/${MIN_VETTED_REQUIRED}. Completed rounds: ${roundsCompleted.join(', ')}`);
+    }
 
     // 3) Outline
     task.currentStep = "Creating content outline";
@@ -476,18 +570,12 @@ class AgentService {
     this.updateStatus(task.sessionId, task);
     await logger.stepStart(task.id, "Generating content outline");
 
-    // Optional: relax source requirement if we truly found nothing.
-    const foundAny = topUrls.length > 0;
-    const prevMinSrc = process.env.MIN_SOURCES;
-    if (!foundAny) process.env.MIN_SOURCES = "0";
-
+    // We have sufficient sources, proceed normally
     const outline = await generateRichOutline(
       `${task.prompt}\n\nResearch context:\n${contextText || "(no web sources available)"}\n\nReturn 'sources' as the actual URLs used.`,
       task.persona,
       task.tone,
     );
-
-    if (!foundAny) process.env.MIN_SOURCES = prevMinSrc;
 
     await logger.trace(task.id, `Generated outline with ${outline.slides?.length || 0} slides`);
     await logger.stepEnd(task.id, "Generating content outline");
