@@ -63,8 +63,13 @@ Preferred communication style: Simple, everyday language.
 ## Recent Updates (October 3, 2025)
 
 ### CRITICAL OVERHAUL: R0-R5 Iterative Source Harvest System
-**Problem**: System exited early with 1-3 sources, producing inadequate reports
-**Solution**: MIN_VETTED_REQUIRED = 10 (enforced) with R0-R5 iterative harvest
+**Problem**: System searched generic queries then rejected 90% of results
+**Solution**: TARGET QUALITY SOURCES FROM THE START + R0-R5 iterative harvest to reach 10 sources
+
+**Initial Query Strategy (FIXED)**:
+- **Scientific topics**: Directly target site:edu, site:gov, site:ncbi.nlm.nih.gov, site:doi.org, museums
+- **Generic topics**: Prioritize site:edu OR site:gov, then research/analysis queries
+- **No more**: "life cycle of ants 2025 trends" or "best practices" nonsense
 
 **R0-R5 Harvest Rounds (Keep searching until ≥10 sources)**:
 - **R0 Seeds**: Add topic-relevant references (Hölldobler & Wilson, Lach et al, Tschinkel)

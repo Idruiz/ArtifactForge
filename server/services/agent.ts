@@ -731,24 +731,36 @@ class AgentService {
 
   private async generateSearchQueries(prompt: string): Promise<string[]> {
     const base = (prompt || "").trim();
-    const generic = [
+    const isScientific = /\b(life cycle|biology|species|ecology|anatomy|physiology|development|metamorphosis|scientific|research)\b/i.test(base);
+    
+    if (isScientific) {
+      // Target scholarly sources directly for scientific topics
+      return [
+        `${base} site:edu OR site:gov OR site:ac.uk`,
+        `${base} site:ncbi.nlm.nih.gov OR site:doi.org`,
+        `${base} PDF site:edu`,
+        `${base} site:smithsonian OR site:amnh.org OR site:biodiversitylibrary.org`,
+      ];
+    }
+    
+    // For non-scientific topics, still prefer quality sources
+    return [
+      `${base} site:edu OR site:gov`,
       `${base}`,
-      `${base} best practices`,
-      `${base} 2025 trends`,
+      `${base} analysis research`,
       `${base} statistics data`,
     ];
-    return generic.slice(0, 4);
   }
 
   private broadenQueries(prompt: string, prev: string[]): string[] {
     const base = (prompt || "").trim();
+    // Always target quality sources when broadening
     const extras = [
-      `${base} overview`,
-      `${base} introduction site:edu`,
-      `${base} government report`,
-      `${base} case study`,
+      `${base} site:edu OR site:ac.uk`,
+      `${base} site:gov OR site:museum`,
+      `${base} PDF site:doi.org`,
+      `${base} research review`,
     ];
-    // keep 2 originals + 2 broad
     return [prev[0] || base, prev[1] || `${base} analysis`, extras[0], extras[1]];
   }
 
