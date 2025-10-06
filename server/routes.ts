@@ -11,6 +11,8 @@ import { logger } from "./utils/logger";
 import { fileStorage } from "./utils/fileStorage";
 import { storage } from "./storage";
 import calendarProxyRouter from "./modules/calendarProxy/router";
+import calendarCredRouter from "./modules/calendarCred/index";
+import calendarBookRouter from "./modules/calendarBook/index";
 import orchestratorRouter from "./orchestrator/index";
 
 interface WsMsg {
@@ -383,7 +385,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Calendar proxy routes (isolated, additive module)
+  // Calendar routes (unified proxy-based stack)
+  app.use("/calendar-cred", calendarCredRouter);
+  app.use("/calendar-book", calendarBookRouter);
   app.use("/calendar-proxy", calendarProxyRouter);
 
   // Orchestrator routes (chat-first command interface)
@@ -394,6 +398,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       webAppUrl: process.env.GAS_WEB_APP_URL || "",
       sharedToken: process.env.GAS_SHARED_TOKEN || "",
+    });
+  });
+
+  // Health check endpoint with backend info
+  app.get("/health", (_req, res) => {
+    res.json({ 
+      ok: true, 
+      backend: process.env.CALENDAR_BACKEND || "proxy" 
     });
   });
 
