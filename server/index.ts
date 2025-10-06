@@ -18,12 +18,10 @@ app.use((req, res, next) => {
   const path = req.path;
   let capturedJson: Record<string, any> | undefined;
 
-  const originalJson = res.json;
-  // @ts-expect-error: widen signature
-  res.json = function (body: any, ...args: any[]) {
+  const originalJson = res.json.bind(res);
+  res.json = function (body: any) {
     capturedJson = body;
-    // @ts-expect-error: preserve original
-    return originalJson.apply(res, [body, ...args]);
+    return originalJson(body);
   };
 
   res.on("finish", () => {
