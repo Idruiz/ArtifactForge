@@ -34,19 +34,6 @@ router.post('/command', async (req, res) => {
       });
     }
 
-    // Get API keys with fallbacks
-    const effectiveKeys = {
-      openai: apiKeys?.openai || process.env.OPENAI_API_KEY || '',
-      serpApi: apiKeys?.serpApi || process.env.SERP_API_KEY || '',
-      unsplash: apiKeys?.unsplash || process.env.UNSPLASH_ACCESS_KEY || '',
-    };
-
-    if (!effectiveKeys.openai) {
-      return res.status(400).json({ 
-        error: 'OpenAI API key required' 
-      });
-    }
-
     console.log(`[ORCH] Command from ${userId}${voice ? ' (voice)' : ''}: ${text.slice(0, 80)}...`);
 
     // Record user turn in context
@@ -55,9 +42,26 @@ router.post('/command', async (req, res) => {
     // Get recent context for intent detection
     const recentContext = contextStore.buildContextPrompt(userId, 6);
 
-    // Detect intent
+    // Detect intent BEFORE checking API keys (calendar doesn't need OpenAI)
     const intent = await detectIntent(text, recentContext);
     console.log(`[ORCH] Detected intent: ${intent.type} (confidence: ${intent.confidence})`);
+
+    // Get API keys with fallbacks
+    const effectiveKeys = {
+      openai: apiKeys?.openai || process.env.OPENAI_API_KEY || '',
+      serpApi: apiKeys?.serpApi || process.env.SERP_API_KEY || '',
+      unsplash: apiKeys?.unsplash || process.env.UNSPLASH_ACCESS_KEY || '',
+    };
+
+    // Only require OpenAI key for artifact generation, not for calendar or generic chat
+    const requiresOpenAI = ['DATA_ANALYSIS', 'PRESENTATION', 'WEBSITE', 'REPORT'].includes(intent.type);
+    if (requiresOpenAI && !effectiveKeys.openai) {
+      return res.status(400).json({ 
+        error: 'OpenAI API key required for artifact generation',
+        intent: intent.type,
+        followup: 'Please configure your OpenAI API key to create presentations, reports, websites, or run data analysis.',
+      });
+    }
 
     // Generate session ID if not provided
     const effectiveSessionId = sessionId || nanoid();
