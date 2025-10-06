@@ -371,7 +371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const filename = `conversation_${req.params.id}_${Date.now()}.csv`;
       const buffer = Buffer.from(csv, "utf-8");
-      await fileStorage.writeFile(filename, buffer);
+      await fileStorage.saveFile(filename, buffer);
       
       res.json({
         filename,

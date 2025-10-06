@@ -12,6 +12,7 @@ const router = Router();
 interface CommandRequest {
   userId: string;
   text: string;
+  conversationId?: string;
   voice?: boolean;
   sessionId?: string;
   apiKeys?: {
@@ -26,7 +27,7 @@ interface CommandRequest {
 
 router.post('/command', async (req, res) => {
   try {
-    const { userId, text, sessionId, apiKeys, voice } = req.body as CommandRequest;
+    const { userId, text, conversationId, sessionId, apiKeys, voice } = req.body as CommandRequest;
 
     if (!text || !userId) {
       return res.status(400).json({ 
@@ -34,13 +35,16 @@ router.post('/command', async (req, res) => {
       });
     }
 
+    // Use conversationId if provided, otherwise fallback to userId for backward compatibility
+    const effectiveConversationId = conversationId || userId;
+
     console.log(`[ORCH] Command from ${userId}${voice ? ' (voice)' : ''}: ${text.slice(0, 80)}...`);
 
-    // Record user turn in context
-    contextStore.recordTurn(userId, 'user', text);
+    // Record user turn in context (scoped by conversationId)
+    contextStore.recordTurn(effectiveConversationId, 'user', text);
 
     // Get recent context for intent detection
-    const recentContext = contextStore.buildContextPrompt(userId, 6);
+    const recentContext = contextStore.buildContextPrompt(effectiveConversationId, 6);
 
     // Detect intent BEFORE checking API keys (calendar doesn't need OpenAI)
     const intent = await detectIntent(text, recentContext);
@@ -66,8 +70,8 @@ router.post('/command', async (req, res) => {
     // Generate session ID if not provided
     const effectiveSessionId = sessionId || nanoid();
 
-    // Build conversation history from context
-    const conversationHistory = contextStore.getAllTurns(userId).map(t => ({
+    // Build conversation history from context (using conversationId for isolation)
+    const conversationHistory = contextStore.getAllTurns(effectiveConversationId).map(t => ({
       role: t.role,
       content: t.text,
     }));
@@ -87,7 +91,7 @@ router.post('/command', async (req, res) => {
       case 'DATA_ANALYSIS': {
         // Build enriched prompt from context + current text
         let enrichedPrompt = text;
-        const topic = contextStore.getTopic(userId);
+        const topic = contextStore.getTopic(effectiveConversationId);
         if (topic) {
           enrichedPrompt = `${topic.summary}\n\n${text}`;
         } else if (recentContext) {
@@ -107,7 +111,7 @@ router.post('/command', async (req, res) => {
       case 'PRESENTATION': {
         // Build enriched prompt
         let enrichedPrompt = text;
-        const topic = contextStore.getTopic(userId);
+        const topic = contextStore.getTopic(effectiveConversationId);
         if (topic) {
           enrichedPrompt = `Create a presentation about ${topic.name}.\n\nContext: ${topic.summary}\n\nRequirements: ${text}`;
         } else if (recentContext) {
@@ -127,7 +131,7 @@ router.post('/command', async (req, res) => {
       case 'WEBSITE': {
         // Build enriched prompt
         let enrichedPrompt = text;
-        const topic = contextStore.getTopic(userId);
+        const topic = contextStore.getTopic(effectiveConversationId);
         if (topic) {
           enrichedPrompt = `Create a website about ${topic.name}.\n\nContext: ${topic.summary}\n\nRequirements: ${text}`;
         } else if (recentContext) {
@@ -147,7 +151,7 @@ router.post('/command', async (req, res) => {
       case 'REPORT': {
         // Build enriched prompt
         let enrichedPrompt = text;
-        const topic = contextStore.getTopic(userId);
+        const topic = contextStore.getTopic(effectiveConversationId);
         if (topic) {
           enrichedPrompt = `Write a report about ${topic.name}.\n\nContext: ${topic.summary}\n\nRequirements: ${text}`;
         } else if (recentContext) {
@@ -179,7 +183,7 @@ router.post('/command', async (req, res) => {
 
     // Update topic if this seems to be a sustained conversation about something
     if (intent.type !== 'GENERIC_CHAT' && intent.params.title) {
-      contextStore.setTopic(userId, intent.params.title, text.slice(0, 200));
+      contextStore.setTopic(effectiveConversationId, intent.params.title, text.slice(0, 200));
     }
 
     // Return result

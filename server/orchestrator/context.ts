@@ -23,8 +23,8 @@ const MAX_TURNS = 20;
 class ContextStore {
   private contexts = new Map<string, UserContext>();
 
-  recordTurn(userId: string, role: 'user' | 'assistant', text: string) {
-    const ctx = this.contexts.get(userId) || { turns: [], topic: null };
+  recordTurn(conversationId: string, role: 'user' | 'assistant', text: string) {
+    const ctx = this.contexts.get(conversationId) || { turns: [], topic: null };
     
     ctx.turns.push({ role, text, ts: Date.now() });
     
@@ -33,41 +33,41 @@ class ContextStore {
       ctx.turns = ctx.turns.slice(-MAX_TURNS);
     }
     
-    this.contexts.set(userId, ctx);
+    this.contexts.set(conversationId, ctx);
   }
 
-  getRecentContext(userId: string, limit: number = 10): Turn[] {
-    const ctx = this.contexts.get(userId);
+  getRecentContext(conversationId: string, limit: number = 10): Turn[] {
+    const ctx = this.contexts.get(conversationId);
     if (!ctx) return [];
     return ctx.turns.slice(-limit);
   }
 
-  getTopic(userId: string): Topic | null {
-    const ctx = this.contexts.get(userId);
+  getTopic(conversationId: string): Topic | null {
+    const ctx = this.contexts.get(conversationId);
     return ctx?.topic || null;
   }
 
-  setTopic(userId: string, name: string, summary: string) {
-    const ctx = this.contexts.get(userId) || { turns: [], topic: null };
+  setTopic(conversationId: string, name: string, summary: string) {
+    const ctx = this.contexts.get(conversationId) || { turns: [], topic: null };
     ctx.topic = { name, summary, ts: Date.now() };
-    this.contexts.set(userId, ctx);
+    this.contexts.set(conversationId, ctx);
   }
 
-  buildContextPrompt(userId: string, limit: number = 10): string {
-    const turns = this.getRecentContext(userId, limit);
+  buildContextPrompt(conversationId: string, limit: number = 10): string {
+    const turns = this.getRecentContext(conversationId, limit);
     if (turns.length === 0) return '';
     
     const lines = turns.map(t => `${t.role === 'user' ? 'User' : 'Assistant'}: ${t.text}`);
     return 'Recent conversation:\n' + lines.join('\n');
   }
 
-  getAllTurns(userId: string): Turn[] {
-    const ctx = this.contexts.get(userId);
+  getAllTurns(conversationId: string): Turn[] {
+    const ctx = this.contexts.get(conversationId);
     return ctx?.turns || [];
   }
 
-  clear(userId: string) {
-    this.contexts.delete(userId);
+  clear(conversationId: string) {
+    this.contexts.delete(conversationId);
   }
 }
 
