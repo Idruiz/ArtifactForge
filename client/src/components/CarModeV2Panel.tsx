@@ -49,6 +49,11 @@ export default function CarModeV2Panel({ userId, tz = "America/Los_Angeles" }: P
       // VAD
       const ctx = new AudioContext();
       audioCtxRef.current = ctx;
+      
+      // CRITICAL: Resume context (browsers start it suspended)
+      await ctx.resume();
+      logLine("Audio context resumed");
+      
       const src = ctx.createMediaStreamSource(ms);
       const proc = ctx.createScriptProcessor(2048, 1, 1);
       meterRef.current = proc;
@@ -63,8 +68,8 @@ export default function CarModeV2Panel({ userId, tz = "America/Los_Angeles" }: P
           if (i && (data[i] > 0) !== (data[i - 1] > 0)) zc++;
         }
         const energy = sum / data.length;
-        // crude VAD thresholds
-        const speaking = energy > 0.02 && zc > 20;
+        // Relaxed VAD thresholds for noise-suppressed input
+        const speaking = energy > 0.008 && zc > 15;
 
         if (speaking && !vadActiveRef.current) {
           // start recording
