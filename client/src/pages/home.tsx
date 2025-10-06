@@ -215,7 +215,7 @@ export default function Home() {
           content: text,
           persona,
           tone,
-          contentAgentEnabled,
+          contentAgentEnabled: false, // ALWAYS false for Car Mode generic chat - prevents artifact generation
           apiKeys,
           conversationHistory: allMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
         },

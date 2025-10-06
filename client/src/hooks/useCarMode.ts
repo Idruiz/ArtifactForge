@@ -128,8 +128,17 @@ export function useCarMode(
     // CRITICAL: Set recRef to null so new MediaRecorder is created on restart
     recRef.current = null;
     
-    // Cancel any ongoing speech to prevent overlap
-    try { window.speechSynthesis.cancel(); } catch {}
+    // Stop any TTS playback
+    if (currentSourceRef.current) {
+      try { currentSourceRef.current.stop(); } catch {}
+      currentSourceRef.current = null;
+    }
+    if (audioCtxForPlaybackRef.current) {
+      try { audioCtxForPlaybackRef.current.close(); } catch {}
+      audioCtxForPlaybackRef.current = null;
+    }
+    audioQueueRef.current = [];
+    isPlayingRef.current = false;
     
     console.log("[Car Mode] Stopped");
   }
@@ -170,13 +179,69 @@ export function useCarMode(
     }
   }
 
-  const speak = useCallback((msg: string) => {
+  const audioQueueRef = useRef<string[]>([]);
+  const isPlayingRef = useRef(false);
+  const audioCtxForPlaybackRef = useRef<AudioContext | null>(null);
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+  const speak = useCallback(async (msg: string) => {
     try {
-      // Cancel any ongoing speech to prevent overlap
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(msg);
-      window.speechSynthesis.speak(u);
-    } catch {}
+      // Add to queue
+      audioQueueRef.current.push(msg);
+      
+      // If already playing, return (queue will process)
+      if (isPlayingRef.current) return;
+      
+      // Process queue
+      while (audioQueueRef.current.length > 0) {
+        const text = audioQueueRef.current.shift();
+        if (!text) continue;
+        
+        isPlayingRef.current = true;
+        
+        // Fetch TTS audio from OpenAI via our backend
+        const r = await fetch("/car-v2/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        
+        if (!r.ok) {
+          console.error("TTS failed:", await r.text());
+          isPlayingRef.current = false;
+          continue;
+        }
+        
+        // Get audio buffer and play
+        const arrayBuffer = await r.arrayBuffer();
+        
+        if (!audioCtxForPlaybackRef.current) {
+          audioCtxForPlaybackRef.current = new AudioContext();
+        }
+        
+        const ctx = audioCtxForPlaybackRef.current;
+        await ctx.resume();
+        
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        
+        currentSourceRef.current = source;
+        
+        // Wait for audio to finish playing
+        await new Promise<void>((resolve) => {
+          source.onended = () => {
+            isPlayingRef.current = false;
+            resolve();
+          };
+          source.start(0);
+        });
+      }
+    } catch (e: any) {
+      console.error("TTS error:", e.message);
+      isPlayingRef.current = false;
+    }
   }, []);
 
   return {

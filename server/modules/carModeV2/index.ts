@@ -52,6 +52,42 @@ function tmpPath(ext: string) {
   return path.join("/tmp", `carv2_${id}.${ext}`);
 }
 
+// ====== /tts (OpenAI TTS) ======
+router.post("/tts", async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: "text required" });
+    if (!OPENAI_API_KEY) return res.status(500).json({ error: "OPENAI_API_KEY not set" });
+
+    // Call OpenAI TTS API
+    const r = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "tts-1",
+        input: text.slice(0, 4096), // Max 4096 chars
+        voice: "alloy", // Options: alloy, echo, fable, onyx, nova, shimmer
+        response_format: "mp3"
+      })
+    });
+
+    if (!r.ok) {
+      const err = await r.text().catch(() => "");
+      return res.status(502).json({ error: "TTS failure", detail: err });
+    }
+
+    // Stream audio back to client
+    const buffer = await r.arrayBuffer();
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.send(Buffer.from(buffer));
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 // ====== /stt ======
 router.post("/stt",
   upload.single("audio"),
