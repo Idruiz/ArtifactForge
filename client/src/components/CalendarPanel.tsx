@@ -3,10 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Mic, MicOff, Send, Link as LinkIcon, CheckCircle2, Clock, Users, Plus } from "lucide-react";
+import { Calendar, Send, Link as LinkIcon, CheckCircle2, Clock, Users, Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useVoice } from "@/hooks/useVoice";
 
 interface CalendarPanelProps {
   userId: string;
@@ -30,14 +29,6 @@ export function CalendarPanel({ userId }: CalendarPanelProps) {
   const [newAlias, setNewAlias] = useState({ alias: "", email: "", icsUrl: "" });
   
   const inputRef = useRef<HTMLInputElement>(null);
-  
-  // Voice integration
-  const { isListening, startListening, stopListening } = useVoice(
-    (text: string) => {
-      setCommand(text);
-      inputRef.current?.focus();
-    }
-  );
 
   const handleConnect = async () => {
     setIsLoading(true);
@@ -208,17 +199,6 @@ export function CalendarPanel({ userId }: CalendarPanelProps) {
     }
   };
 
-  const handleVoiceToggle = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-      toast({
-        title: "Listening...",
-        description: "Speak your calendar command",
-      });
-    }
-  };
 
   return (
     <div className="h-full overflow-y-auto p-4 bg-slate-50 dark:bg-slate-900">
@@ -238,7 +218,7 @@ export function CalendarPanel({ userId }: CalendarPanelProps) {
               <div className="space-y-3">
                 <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <p className="text-sm text-blue-900 dark:text-blue-100">
-                    Connect your Google Calendar to start scheduling meetings with voice or text commands.
+                    Connect your Google Calendar to start scheduling meetings with natural language commands.
                   </p>
                 </div>
                 <Button
@@ -276,15 +256,6 @@ export function CalendarPanel({ userId }: CalendarPanelProps) {
                       data-testid="input-quick-command"
                     />
                     <Button
-                      onClick={handleVoiceToggle}
-                      variant={isListening ? "destructive" : "outline"}
-                      size="icon"
-                      data-testid="button-voice-toggle"
-                      className="dark:border-slate-600"
-                    >
-                      {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                    </Button>
-                    <Button
                       onClick={handleCommand}
                       disabled={isLoading || !command.trim()}
                       data-testid="button-run-command"
@@ -292,11 +263,6 @@ export function CalendarPanel({ userId }: CalendarPanelProps) {
                       <Send className="w-4 h-4" />
                     </Button>
                   </div>
-                  {isListening && (
-                    <p className="text-xs text-muted-foreground dark:text-slate-400">
-                      Listening...
-                    </p>
-                  )}
                   <p className="text-xs text-muted-foreground dark:text-slate-400">
                     Examples: "schedule team meeting tomorrow at 3pm 60 min" • "find free 30 min slot with colleague calendar"
                   </p>
