@@ -12,18 +12,14 @@ interface ChatPanelProps {
   isConnected: boolean;
   persona: Persona;
   tone: Tone;
-  voiceEnabled: boolean;
   contentAgentEnabled: boolean;
   chatInput: string;
-  isListening: boolean;
   isCarMode: boolean;
   onPersonaChange: (persona: Persona) => void;
   onToneChange: (tone: Tone) => void;
-  onVoiceToggle: (enabled: boolean) => void;
   onContentAgentToggle: (enabled: boolean) => void;
   onChatInputChange: (input: string) => void;
   onSendMessage: () => void;
-  onStartVoiceInput: () => void;
   onStartCarMode: () => void;
   onStopCarMode: () => void;
   onShowApiKeys: () => void;
@@ -34,18 +30,14 @@ export function ChatPanel({
   isConnected,
   persona,
   tone,
-  voiceEnabled,
   contentAgentEnabled,
   chatInput,
-  isListening,
   isCarMode,
   onPersonaChange,
   onToneChange,
-  onVoiceToggle,
   onContentAgentToggle,
   onChatInputChange,
   onSendMessage,
-  onStartVoiceInput,
   onStartCarMode,
   onStopCarMode,
   onShowApiKeys,
@@ -127,12 +119,6 @@ export function ChatPanel({
             </Select>
           </div>
 
-          {/* Voice Toggle */}
-          <div className="flex items-center space-x-2">
-            <Label className="text-sm font-medium">Voice:</Label>
-            <Switch checked={voiceEnabled} onCheckedChange={onVoiceToggle} />
-          </div>
-
           {/* Content Agent Toggle */}
           <div className="flex items-center space-x-2">
             <Label className="text-sm font-medium" title="When ON: Always generate artifacts. When OFF: Auto-detect based on your request.">
@@ -173,15 +159,6 @@ export function ChatPanel({
               className="resize-none pr-12"
               data-testid="input-chat"
             />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onStartVoiceInput}
-              className="absolute right-2 top-2"
-              disabled={isListening}
-            >
-              <Mic className={`w-5 h-5 ${isListening ? 'text-red-500 animate-pulse' : 'text-slate-400'}`} />
-            </Button>
           </div>
           <Button onClick={onSendMessage} disabled={!chatInput.trim()} data-testid="button-send">
             Send

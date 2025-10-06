@@ -6,7 +6,7 @@ import { CalendarPanel } from "@/components/CalendarPanel";
 import CarModeV2Panel from "@/components/CarModeV2Panel";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { useVoice } from "@/hooks/useVoice";
+import { useCarMode } from "@/hooks/useCarMode";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -107,7 +107,6 @@ export default function Home() {
   // ---------- UI state ----------
   const [persona, setPersona] = useState<Persona>("professional");
   const [tone, setTone] = useState<Tone>("formal");
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [contentAgentEnabled, setContentAgentEnabled] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [showApiKeysModal, setShowApiKeysModal] = useState(false);
@@ -135,22 +134,15 @@ export default function Home() {
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
-  // ---------- voice hook with Car Mode support ----------
+  // ---------- Car Mode with working V2 logic ----------
   const { 
-    isListening, 
-    isSupported, 
-    startListening, 
-    speak, 
-    startCarMode, 
-    stopCarMode, 
-    isCarMode 
-  } = useVoice(
-    (text) => {
-      // Normal voice input - append to chat input
-      setChatInput((prev) => prev + (prev ? " " : "") + text);
-    },
+    isCarMode,
+    startCarMode,
+    stopCarMode,
+    speak: carModeSpeak
+  } = useCarMode(
     async (text) => {
-      // Car Mode auto-send callback (triggered after 3 seconds of silence)
+      // Transcription received from Car Mode
       if (!text.trim() || !currentConversationId) return;
 
       const userId = sessionId;
@@ -212,7 +204,7 @@ export default function Home() {
         }
 
         // Always speak in car mode
-        speak(responseContent);
+        carModeSpeak(responseContent);
         return;
       }
 
@@ -232,25 +224,24 @@ export default function Home() {
     }
   );
 
-  // ---------- speak assistant replies (both normal and Car Mode) ----------
+  // ---------- speak assistant replies in Car Mode ----------
   const lastSpokenIdRef = useRef<string>("");
   const speakingInProgressRef = useRef<boolean>(false);
   
   useEffect(() => {
-    if ((voiceEnabled || isCarMode) && wsMessages.length > 0 && !speakingInProgressRef.current) {
+    if (isCarMode && wsMessages.length > 0 && !speakingInProgressRef.current) {
       const last = wsMessages[wsMessages.length - 1];
       if (last.role === "assistant" && last.status === "completed" && last.id !== lastSpokenIdRef.current) {
         console.log(`[TTS Trigger] Speaking message ID: ${last.id}`);
         lastSpokenIdRef.current = last.id;
         speakingInProgressRef.current = true;
-        speak(last.content);
-        // Reset flag after a delay to allow next message
+        carModeSpeak(last.content);
         setTimeout(() => {
           speakingInProgressRef.current = false;
         }, 1000);
       }
     }
-  }, [wsMessages, voiceEnabled, isCarMode, speak]);
+  }, [wsMessages, isCarMode, carModeSpeak]);
 
   // ---------- handlers ----------
   const handleSendMessage = async () => {
@@ -317,9 +308,8 @@ export default function Home() {
         });
       }
 
-      if (orchResult.followup && voiceEnabled) {
-        speak(orchResult.followup);
-      }
+      // Response already added to messages above
+      // Car Mode will auto-speak via the effect hook
       return;
     }
 
@@ -417,39 +407,15 @@ export default function Home() {
         isConnected={isConnected}
         persona={persona}
         tone={tone}
-        voiceEnabled={voiceEnabled}
         contentAgentEnabled={contentAgentEnabled}
         chatInput={chatInput}
-        isListening={isListening}
         isCarMode={isCarMode}
         onPersonaChange={setPersona}
         onToneChange={setTone}
-        onVoiceToggle={setVoiceEnabled}
         onContentAgentToggle={setContentAgentEnabled}
         onChatInputChange={setChatInput}
         onSendMessage={handleSendMessage}
-        onStartVoiceInput={
-          isSupported
-            ? startListening
-            : () =>
-                toast({
-                  title: "Voice input not supported",
-                  description:
-                    "Your browser doesn't support speech recognition.",
-                  variant: "destructive",
-                })
-        }
-        onStartCarMode={
-          isSupported
-            ? startCarMode
-            : () =>
-                toast({
-                  title: "Voice input not supported",
-                  description:
-                    "Your browser doesn't support speech recognition.",
-                  variant: "destructive",
-                })
-        }
+        onStartCarMode={startCarMode}
         onStopCarMode={stopCarMode}
         onShowApiKeys={() => setShowApiKeysModal(true)}
         onRestartAgent={handleRestartAgent}
