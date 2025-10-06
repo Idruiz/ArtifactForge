@@ -60,6 +60,7 @@ export default function CarModeV2Panel({ userId, tz = "America/Los_Angeles" }: P
       src.connect(proc);
       proc.connect(ctx.destination);
 
+      let debugCounter = 0;
       proc.onaudioprocess = (ev) => {
         const data = ev.inputBuffer.getChannelData(0);
         let sum = 0; let zc = 0;
@@ -68,6 +69,13 @@ export default function CarModeV2Panel({ userId, tz = "America/Los_Angeles" }: P
           if (i && (data[i] > 0) !== (data[i - 1] > 0)) zc++;
         }
         const energy = sum / data.length;
+        
+        // Debug logging every 50 frames (~1 second)
+        debugCounter++;
+        if (debugCounter % 50 === 0) {
+          logLine(`🔊 energy: ${energy.toFixed(4)}, zc: ${zc}`);
+        }
+        
         // Relaxed VAD thresholds for noise-suppressed input
         const speaking = energy > 0.008 && zc > 15;
 
@@ -76,7 +84,7 @@ export default function CarModeV2Panel({ userId, tz = "America/Los_Angeles" }: P
           vadActiveRef.current = true;
           chunksRef.current = [];
           rec.start();
-          logLine("🎙️ voice detected — recording…");
+          logLine(`🎙️ voice detected (e:${energy.toFixed(4)}, zc:${zc})`);
           if (vadTimerRef.current) { window.clearTimeout(vadTimerRef.current); vadTimerRef.current = null; }
         } else if (!speaking && vadActiveRef.current) {
           // schedule stop after silenceMs
