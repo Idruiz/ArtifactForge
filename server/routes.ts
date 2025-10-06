@@ -9,6 +9,7 @@ import path from "path";
 import { agentService } from "./services/agent"; // <-- matches your repo name
 import { logger } from "./utils/logger";
 import { fileStorage } from "./utils/fileStorage";
+import { storage } from "./storage";
 import calendarProxyRouter from "./modules/calendarProxy/router";
 import orchestratorRouter from "./orchestrator/index";
 
@@ -283,6 +284,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Task started", sessionId, taskId });
     } catch (error: any) {
       res.status(500).json({ error: error?.message || "agent failed" });
+    }
+  });
+
+  // Conversation management routes
+  app.get("/api/conversations", async (req, res) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const conversations = await storage.listConversations(userId, limit);
+      res.json(conversations);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to list conversations" });
+    }
+  });
+
+  app.post("/api/conversations", async (req, res) => {
+    try {
+      const { id, userId, title } = req.body;
+      if (!id || !title) {
+        return res.status(400).json({ error: "id and title are required" });
+      }
+      const conversation = await storage.createConversation({ id, userId, title });
+      res.json(conversation);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to create conversation" });
+    }
+  });
+
+  app.get("/api/conversations/:id", async (req, res) => {
+    try {
+      const conversation = await storage.getConversation(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      const messages = await storage.getMessages(req.params.id);
+      res.json({ ...conversation, messages });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to get conversation" });
+    }
+  });
+
+  app.post("/api/conversations/:id/messages", async (req, res) => {
+    try {
+      const { role, content, metadata } = req.body;
+      if (!role || !content) {
+        return res.status(400).json({ error: "role and content are required" });
+      }
+      const message = await storage.createMessage({
+        conversationId: req.params.id,
+        role,
+        content,
+        metadata,
+      });
+      
+      await storage.updateConversation(req.params.id, { updatedAt: new Date() });
+      res.json(message);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to create message" });
+    }
+  });
+
+  app.delete("/api/conversations/:id", async (req, res) => {
+    try {
+      await storage.deleteConversation(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to delete conversation" });
+    }
+  });
+
+  app.post("/api/conversations/:id/export", async (req, res) => {
+    try {
+      const conversation = await storage.getConversation(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      const messages = await storage.getMessages(req.params.id);
+      
+      let csv = "Role,Content,Timestamp\n";
+      messages.forEach((msg) => {
+        const content = msg.content.replace(/"/g, '""');
+        csv += `"${msg.role}","${content}","${msg.createdAt}"\n`;
+      });
+      
+      const filename = `conversation_${req.params.id}_${Date.now()}.csv`;
+      const buffer = Buffer.from(csv, "utf-8");
+      await fileStorage.writeFile(filename, buffer);
+      
+      res.json({
+        filename,
+        url: fileStorage.getPublicUrl(filename),
+        size: buffer.length,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to export conversation" });
     }
   });
 
