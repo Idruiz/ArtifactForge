@@ -10,6 +10,7 @@ import { agentService } from "./services/agent"; // <-- matches your repo name
 import { logger } from "./utils/logger";
 import { fileStorage } from "./utils/fileStorage";
 import calendarProxyRouter from "./modules/calendarProxy/router";
+import orchestratorRouter from "./orchestrator/index";
 
 interface WsMsg {
   type: "join" | "chat" | "restart" | "updateKeys";
@@ -287,6 +288,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Calendar proxy routes (isolated, additive module)
   app.use("/calendar-proxy", calendarProxyRouter);
+
+  // Orchestrator routes (chat-first command interface)
+  app.use("/orchestrator", orchestratorRouter);
 
   // Calendar config endpoint (provides env vars to frontend)
   app.get("/api/calendar/config", (_req, res) => {

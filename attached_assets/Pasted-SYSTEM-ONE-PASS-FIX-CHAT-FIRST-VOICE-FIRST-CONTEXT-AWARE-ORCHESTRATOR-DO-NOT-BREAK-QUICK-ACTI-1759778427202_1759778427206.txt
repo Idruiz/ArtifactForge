@@ -1,0 +1,155 @@
+SYSTEM // ONE PASS FIX: CHAT-FIRST, VOICE-FIRST, CONTEXT-AWARE ORCHESTRATOR (DO NOT BREAK QUICK ACTIONS)
+
+You are upgrading the project to behave like a true chat-first agent. Users must be able to ASK (voice or text) and get artifacts & actions without going through Quick Actions. Quick Actions remain shortcuts, not the main path.
+
+# NON-NEGOTIABLES
+- Additive only: do not remove or change existing working pipelines; only extend and fix routing.
+- No regressions in current Quick Actions.
+- Keep the new logic in an isolated module: `src/orchestrator/**` + minimal UI hooks.
+- All existing routes (artifact pipelines, data analysis, calendar-multi, calendar-proxy) must remain accessible as-is.
+- Strong context handling: the agent should use recent chat context to fill missing parameters (title, topic, data source, date/time, etc.).
+- Voice (Car Mode) must exit “listening” automatically on ~3s silence and send the transcription.
+
+# WHAT’S BROKEN & WHAT TO BUILD
+
+0) CAR MODE: End-of-speech detection is stuck. Build a tiny VAD (voice activity detection) with a 3s trailing-silence auto-stop, chunked streaming to STT, and a finite state machine.
+1) CHAT-FIRST ORCHESTRATOR: A single endpoint that takes raw user text (or STT transcript), infers intent, routes to the correct pipeline, and injects the prompt/context.
+2) INTENT + PARAM PARSER: Use rules + cheap libraries (chrono-node for time, fast keyword heuristics) to map utterances to:
+   - PRESENTATION (pptx)
+   - WEBSITE (static page/components)
+   - REPORT (markdown/PDF/doc)
+   - DATA_ANALYSIS (code + results)
+   - CALENDAR (schedule/find free)
+   - GENERIC_CHAT (normal LLM reply, no artifact)
+3) CONTEXT STORE: Keep rolling conversation context (last ~20 turns) and structured “topic memory” (e.g., “coconuts” thread) so “turn this into a presentation/report/site” works.
+4) PIPELINE BRIDGE: Each intent calls the appropriate existing route with the FULL prompt (user text + stitched context). If a pipeline currently expects a “prompt” field, feed it. If it needs parameters (title, duration), fill them from parser/context or ask a single clarifying follow-up (but only when absolutely required).
+5) DATA ANALYSIS: Fix by making `/orchestrator/command` call the existing analysis route with `{prompt, dataRefs, goals}` derived from chat + context. No dummy artifacts.
+6) CALENDAR FROM CHAT: Allow “book a meeting…” in chat by calling calendar route programmatically (Option B `calendar-multi/command` if present, else `calendar-proxy` fallback).
+
+# FILES TO ADD / MODIFY (all additive)
+
+A) Backend
+- `src/orchestrator/index.ts`      // Express router: POST /orchestrator/command
+- `src/orchestrator/intent.ts`     // intent detection + parameter extraction
+- `src/orchestrator/context.ts`    // rolling context + structured topic memory (SQLite or in-memory w/ eviction)
+- `src/orchestrator/bridge.ts`     // call into existing pipelines
+- `src/orchestrator/voice.ts`      // car mode FSM + silence detection API (optional if front-end only)
+- Wire router in `src/index.ts`: `app.use("/orchestrator", orchestratorRouter);`
+
+B) Frontend (minimal additive hooks)
+- Add a **“Quick Command”** input above the chat box (NOT replacing chat), or reuse the chat box by posting to `/orchestrator/command` before defaulting to generic chat.
+- Car Mode: implement proper end-of-speech handling using WebAudio + silence timer; on stop, POST transcript to `/orchestrator/command`.
+
+# IMPLEMENTATION DETAILS
+
+A) INTENT DETECTION (cheap + robust)
+- Use `chrono-node` for date/time parsing.
+- Keyword heuristics to classify:
+  - PRESENTATION: /\b(presentation|slides|ppt|deck|pitch)\b/
+  - WEBSITE: /\b(website|web\s?app|landing|page|site)\b/
+  - REPORT: /\b(report|write-up|summary|brief|whitepaper|doc)\b/
+  - DATA_ANALYSIS: /\b(analyze|analysis|explore|EDA|chart|plot|regression|cluster|pivot)\b/
+  - CALENDAR: /\b(schedule|book|meeting|invite|free slot|availability)\b/
+- If multiple match, pick the strongest by priority: CALENDAR > DATA_ANALYSIS > PRESENTATION > WEBSITE > REPORT. If conflict persists, prefer the one most recently discussed in context.
+- If none match, return GENERIC_CHAT.
+
+B) PARAM PARSING (examples)
+- Titles: “… called X”, “… titled X”, “… for X”, or noun phrase after the intent word. Default to something sensible (“Team Meeting”, “Coconuts Overview”).
+- Duration: detect “30 min”, “1 hour”, “half hour”.
+- Calendar: detect people/aliases in quotes or after “with”, parse time with chrono; build payload for `calendar-multi/command` or `schedule`.
+- Data Analysis: track referenced files/datasets mentioned in recent turns (context store).
+- Presentation/Website/Report: inject the ENTIRE recent chat about the topic (context) plus user’s latest command into the pipeline payload.
+
+C) CONTEXT STORE
+- `context.set(userId, turn)`: keep last 20 turns of user+assistant text.
+- `topics`: simple map `{topic -> {summary, lastSeenAt}}`; update when user talks a lot about a subject (e.g., “coconuts”).
+- On “turn that into a report/website/presentation”, pull last topic (by recency) and concatenate summary + last 6–10 turns as `prompt`.
+
+D) BRIDGE (routes to call)
+- PRESENTATION → existing presentation pipeline route (e.g., `/artifacts/presentation/create`) with `{prompt, title?, audience?, length?, style?}`.
+- WEBSITE → `/artifacts/website/create` similarly.
+- REPORT → `/artifacts/report/create`.
+- DATA_ANALYSIS → existing analysis route (e.g., `/analysis/run`) with `{prompt, dataRefs?, tasks[]}`.
+- CALENDAR → call `/calendar-multi/command` (if exists) else `/calendar-proxy/schedule` or `/calendar-proxy/free` then `/schedule`.
+- GENERIC_CHAT → fall back to your standard chat handler (unchanged).
+
+E) CAR MODE (frontend sketch — minimal changes)
+- Add a small VAD state machine:
+  - States: `idle -> listening -> sending -> idle`.
+  - While listening, collect PCM; compute RMS every 50ms. If RMS < threshold for 3000ms, auto-stop & finalize.
+  - On finalize, send `{ transcript, userId, tz }` to `/orchestrator/command`.
+- Never leave “listening” without a hard 30s max timeout.
+- Show a 3s shrinking progress ring while silence accrues.
+
+F) ERROR BEHAVIOR
+- If a target pipeline returns 4xx, surface a single, actionable message (“Missing dataset. Say ‘use file X’ or upload a CSV.”) and keep chat responsive.
+- Never create dummy artifacts. If parameters missing AND cannot be inferred, ask ONE precise follow-up, then proceed automatically.
+
+# CODE SUGGESTIONS (drop-in – keep concise)
+
+1) `src/orchestrator/index.ts`
+- POST `/orchestrator/command`: body `{ userId, text, voice?: boolean, tz?, workHours?, meta? }`
+- Steps:
+  1. Append to context.
+  2. Run `detectIntent(text, context)`.
+  3. If CALENDAR → call calendar bridge (multi/command first).
+  4. If DATA_ANALYSIS → build `{prompt}` from context+text; call analysis route; return artifact link/id.
+  5. If PRESENTATION/WEBSITE/REPORT → build prompt from topic context and call respective pipeline; return artifact link/id.
+  6. Else → pass-through to generic chat.
+- Always return a clean JSON: `{intent, actionTaken, artifact?, event?, followup?}`
+
+2) `src/orchestrator/intent.ts`
+- Export `detectIntent(text, context)` and helpers: `parseCalendar(text)`, `parseDuration(text)`, `extractTitle(text)`.
+- Use `chrono-node` for date/time; keywords for type; small alias resolver if present.
+
+3) `src/orchestrator/context.ts`
+- In-memory Map keyed by userId with:
+  - `turns: {role:'user'|'assistant', text:string, ts:number}[]` (trim to 20)
+  - `topic: {name:string, summary:string, ts:number} | null`
+- Export `recordTurn`, `getRecentContext`, `getTopic`, `setTopic`.
+
+4) `src/orchestrator/bridge.ts` (pseudo, replace endpoints with your actual ones)
+- `toPresentation({prompt, title}) => POST /artifacts/presentation/create`
+- `toWebsite({prompt, title}) => POST /artifacts/website/create`
+- `toReport({prompt, title}) => POST /artifacts/report/create`
+- `toAnalysis({prompt, dataRefs}) => POST /analysis/run`
+- `toCalendar({payload}) => first try /calendar-multi/command else fallback to /calendar-proxy/schedule`
+- Each returns `{ok, id/link, ...}` or throws with a helpful message.
+
+5) FRONTEND glue
+- Chat box: before default chat send, hit `/orchestrator/command`. If response contains `artifact` or `event`, render success with link. If `intent=GENERIC_CHAT`, then continue with normal chat handling.
+- Calendar quick action button remains, but now **chat** path also works.
+
+# ACCEPTANCE TESTS (HARD REQUIREMENTS)
+
+CAR MODE
+- Start car mode, speak a sentence, then stop speaking. Within 3s, it exits “listening”, posts transcript, and you see the agent’s response.
+- If you keep silent for 30s, it auto-stops anyway.
+
+CHAT-FIRST
+- “Create a 10-slide presentation summarizing everything we discussed about coconuts for a non-technical audience.” → Presentation pipeline runs; title defaulted from topic; link returned. No Quick Actions touch.
+- “Turn this conversation into a 2-page report.” → Report pipeline runs with stitched context from the coconut thread; link returned.
+- “Make a simple website from our coconut plan.” → Website pipeline runs; link returned.
+
+DATA ANALYSIS
+- “Analyze the sales.csv I uploaded: show YoY growth and a bar chart” → Analysis pipeline runs with `{prompt:"…", dataRefs:["sales.csv"]}`; returns artifact with chart. No dummy file.
+
+CALENDAR (from chat)
+- “Book a 30-minute meeting with ‘colleague calendar’ tomorrow at 12:30.” → Calendar event created; returns `eventId` + `htmlLink`.
+- “Find a free 45 minute slot with ‘colleague calendar’ this week and invite them.” → It finds a slot (via calendar-multi/command or proxy flow) and schedules without opening the calendar form.
+
+GUARDRAILS
+- If intent is ambiguous, ask **one** clarifying question, then proceed automatically.
+- No dummy artifacts ever.
+- Quick Actions continue to work as shortcuts.
+
+# DEPENDENCIES TO ADD
+- Backend: `"chrono-node": "^2.6.3"`
+- Optional (if not present): `"express"`, `"zod"`
+
+# LOGGING
+- Prefix `[ORCH]` for orchestrator logs, `[VAD]` for voice. No secrets in logs.
+
+# DELIVERY
+- Implement the orchestrator module, wire `/orchestrator/command`, add minimal chat/front-end hook, upgrade car mode listener to 3s trailing silence VAD. Do not refactor existing pipelines; just bridge to them.
+- When done, print a boot log with all orchestrator routes.
