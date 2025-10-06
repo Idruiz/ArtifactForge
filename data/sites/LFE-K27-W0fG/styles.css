@@ -1,0 +1,165 @@
+:root {
+  --bg: #0f172a;
+  --paper: #111827;
+  --text: #e5e7eb;
+  --sub: #94a3b8;
+  --accent: #6366f1;
+  --band: #22d3ee;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+header {
+  background: var(--paper);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+nav {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 2rem;
+}
+
+nav a {
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+nav a:hover {
+  color: var(--accent);
+}
+
+nav a.active {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 4px;
+}
+
+.admin-btn {
+  background: var(--accent);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-decoration: none;
+  display: none;
+}
+
+.admin-btn.visible {
+  display: inline-block;
+}
+
+main {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+
+.hero {
+  text-align: center;
+  padding: 4rem 0;
+  background: linear-gradient(135deg, var(--accent), var(--band));
+  color: white;
+  border-radius: 16px;
+  margin-bottom: 3rem;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+.section {
+  background: var(--paper);
+  padding: 2.5rem;
+  margin-bottom: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.section h2 {
+  color: var(--text);
+  margin-bottom: 1rem;
+  font-size: 1.8rem;
+}
+
+.section .band {
+  width: 80px;
+  height: 4px;
+  background: var(--band);
+  margin-bottom: 1.5rem;
+  border-radius: 2px;
+}
+
+.section p {
+  color: var(--sub);
+  margin-bottom: 1rem;
+}
+
+.section ul {
+  list-style: disc;
+  margin-left: 1.5rem;
+  color: var(--sub);
+}
+
+.section ul li {
+  margin-bottom: 0.5rem;
+}
+
+.section img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+footer {
+  text-align: center;
+  padding: 2rem;
+  color: var(--sub);
+  margin-top: 4rem;
+}
+
+@media (max-width: 768px) {
+  nav ul {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .hero h1 {
+    font-size: 2rem;
+  }
+  
+  main {
+    padding: 0 1rem;
+  }
+}

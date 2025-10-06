@@ -1,0 +1,33 @@
+[2025-10-03T13:13:41.617Z] [trace] REQUEST NORMALIZER: RESEARCH_REPORT_DOCX (Topic with no per-student metrics)
+[2025-10-03T13:13:41.618Z] [trace] DATA ORIGIN: topic-from-prompt
+[2025-10-03T13:13:41.618Z] [trace] Topic: Build a complete HTML website about the live cycle of budgies with multiple pages and modern design
+[2025-10-03T13:13:41.620Z] [step_start] Starting: Planning content generation
+[2025-10-03T13:13:41.621Z] [trace] Generated 4 search queries
+[2025-10-03T13:13:41.622Z] [step_end] Completed: Planning content generation
+[2025-10-03T13:13:41.623Z] [step_start] Starting: Web research
+[2025-10-03T13:13:42.592Z] [trace] Found 18 search results
+[2025-10-03T13:13:42.593Z] [step_end] Completed: Web research
+[2025-10-03T13:13:42.594Z] [step_start] Starting: Vetting sources
+[2025-10-03T13:13:42.595Z] [trace] Source vetting: 0 vetted, 18 rejected
+[2025-10-03T13:13:42.596Z] [trace] ✗ Rejected (showing first 5): https://websitesetup.org/website-coding-html-css/ [SCORE 0.00→FAIL] | https://developer.mozilla.org/en-US/docs/Learn_web_developme [SCORE 0.00→FAIL] | https://www.geeksforgeeks.org/html/how-to-create-a-nested-we [BLOCKLIST] | https://www.learn-html.org/ [SCORE 0.00→FAIL] | https://developer.mozilla.org/en-US/docs/Learn_web_developme [SCORE 0.00→FAIL]
+[2025-10-03T13:13:42.596Z] [trace] Harvest complete: 0 sources. Rounds: 
+[2025-10-03T13:13:42.597Z] [step_end] Completed: Vetting sources
+[2025-10-03T13:13:42.598Z] [step_start] Starting: Generating content outline
+[2025-10-03T13:15:15.135Z] [trace] Generated outline with 11 slides
+[2025-10-03T13:15:15.137Z] [step_end] Completed: Generating content outline
+[2025-10-03T13:15:15.150Z] [step_start] Starting: Processing visual content
+[2025-10-03T13:15:20.248Z] [trace] Visuals → images: 11, charts: 3
+[2025-10-03T13:15:20.249Z] [step_end] Completed: Processing visual content
+[2025-10-03T13:15:20.250Z] [step_start] Starting: Building WEBSITE
+[2025-10-03T13:15:20.251Z] [step_start] Starting: Building website
+[2025-10-03T13:15:20.260Z] [step_start] Starting: Building multi-page website with admin panel
+[2025-10-03T13:15:20.260Z] [trace] buildWebsite: Starting generation
+[2025-10-03T13:15:20.264Z] [trace] buildWebsite: Generated 4 HTML pages
+[2025-10-03T13:15:20.266Z] [trace] buildWebsite: Generated admin and Apps Script files
+[2025-10-03T13:15:20.268Z] [trace] buildWebsite: Saving to /home/runner/workspace/data/sites/LFE-K27-W0fG
+[2025-10-03T13:15:20.274Z] [trace] buildWebsite: Saved 4 pages to data/sites/LFE-K27-W0fG/
+[2025-10-03T13:15:20.305Z] [trace] buildWebsite: ZIP buffer created, 15788 bytes
+[2025-10-03T13:15:20.306Z] [step_end] Completed: Built multi-page website bundle
+[2025-10-03T13:15:20.307Z] [trace] buildWebsite: Live at /sites/LFE-K27-W0fG/, ZIP: Comprehensive_Multi-Page_HTML_Site_for_Budgerigar_Life_Cycle_and_CareWebsite_2025-10-03T13-15-20.zip
+[2025-10-03T13:15:20.308Z] [step_end] Completed: Building WEBSITE
+[2025-10-03T13:15:20.309Z] [delivery] ✅ Artifacts emitted: Comprehensive_Multi-Page_HTML_Site_for_Budgerigar_Life_Cycle_and_CareWebsite_2025-10-03T13-15-20.zip

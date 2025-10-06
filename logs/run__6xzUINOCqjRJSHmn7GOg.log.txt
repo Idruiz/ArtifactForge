@@ -1,0 +1,33 @@
+[2025-10-03T13:38:26.024Z] [trace] REQUEST NORMALIZER: RESEARCH_REPORT_DOCX (Topic with no per-student metrics)
+[2025-10-03T13:38:26.032Z] [trace] DATA ORIGIN: topic-from-prompt
+[2025-10-03T13:38:26.036Z] [trace] Topic: Build a complete HTML website about about pharmacy practice in BC with multiple pages and modern design
+[2025-10-03T13:38:26.036Z] [step_start] Starting: Planning content generation
+[2025-10-03T13:38:26.038Z] [trace] Generated 4 search queries
+[2025-10-03T13:38:26.039Z] [step_end] Completed: Planning content generation
+[2025-10-03T13:38:26.040Z] [step_start] Starting: Web research
+[2025-10-03T13:38:26.987Z] [trace] Found 18 search results
+[2025-10-03T13:38:26.989Z] [step_end] Completed: Web research
+[2025-10-03T13:38:26.996Z] [step_start] Starting: Vetting sources
+[2025-10-03T13:38:26.998Z] [trace] Source vetting: 0 vetted, 18 rejected
+[2025-10-03T13:38:27.004Z] [trace] ✗ Rejected (showing first 5): https://www.w3schools.com/html/default.asp [SCORE 0.00→FAIL] | https://pharmacy-tech-study.com/ [SCORE 0.00→FAIL] | https://pharmaceutical-journal.com/article/ld/principles-of- [SCORE 0.00→FAIL] | https://developer.mozilla.org/en-US/docs/Web/HTML [SCORE 0.00→FAIL] | https://www.w3schools.com/html/html_examples.asp [SCORE 0.00→FAIL]
+[2025-10-03T13:38:27.005Z] [trace] Harvest complete: 0 sources. Rounds: 
+[2025-10-03T13:38:27.007Z] [step_end] Completed: Vetting sources
+[2025-10-03T13:38:27.009Z] [step_start] Starting: Generating content outline
+[2025-10-03T13:40:25.327Z] [trace] Generated outline with 14 slides
+[2025-10-03T13:40:25.328Z] [step_end] Completed: Generating content outline
+[2025-10-03T13:40:25.338Z] [step_start] Starting: Processing visual content
+[2025-10-03T13:40:31.416Z] [trace] Visuals → images: 14, charts: 0
+[2025-10-03T13:40:31.418Z] [step_end] Completed: Processing visual content
+[2025-10-03T13:40:31.420Z] [step_start] Starting: Building WEBSITE
+[2025-10-03T13:40:31.421Z] [step_start] Starting: Building website
+[2025-10-03T13:40:31.435Z] [step_start] Starting: Building multi-page website with admin panel
+[2025-10-03T13:40:31.436Z] [trace] buildWebsite: Starting generation
+[2025-10-03T13:40:31.438Z] [trace] buildWebsite: Generated 4 HTML pages
+[2025-10-03T13:40:31.438Z] [trace] buildWebsite: Generated admin and Apps Script files
+[2025-10-03T13:40:31.439Z] [trace] buildWebsite: Saving to /home/runner/workspace/data/sites/YsAfDwERSfUa
+[2025-10-03T13:40:31.445Z] [trace] buildWebsite: Saved 4 pages to data/sites/YsAfDwERSfUa/
+[2025-10-03T13:40:31.457Z] [trace] buildWebsite: ZIP buffer created, 16510 bytes
+[2025-10-03T13:40:31.457Z] [step_end] Completed: Built multi-page website bundle
+[2025-10-03T13:40:31.458Z] [trace] buildWebsite: Live at /sites/YsAfDwERSfUa/, ZIP: Comprehensive_Site_Plan_Pharmacy_Practice_in_British_Columbia_Regulatory_Clinical_and_Digital_FrameworkWebsite_2025-10-03T13-40-31.zip
+[2025-10-03T13:40:31.458Z] [step_end] Completed: Building WEBSITE
+[2025-10-03T13:40:31.459Z] [delivery] ✅ Artifacts emitted: Comprehensive_Site_Plan_Pharmacy_Practice_in_British_Columbia_Regulatory_Clinical_and_Digital_FrameworkWebsite_2025-10-03T13-40-31.zip
