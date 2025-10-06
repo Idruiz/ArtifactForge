@@ -9,6 +9,7 @@ import path from "path";
 import { agentService } from "./services/agent"; // <-- matches your repo name
 import { logger } from "./utils/logger";
 import { fileStorage } from "./utils/fileStorage";
+import calendarProxyRouter from "./modules/calendarProxy/router";
 
 interface WsMsg {
   type: "join" | "chat" | "restart" | "updateKeys";
@@ -283,6 +284,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error?.message || "agent failed" });
     }
   });
+
+  // Calendar proxy routes (isolated, additive module)
+  app.use("/calendar-proxy", calendarProxyRouter);
 
   return httpServer;
 }
