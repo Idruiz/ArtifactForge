@@ -1,0 +1,302 @@
+the UI you have is a form. You want hands-free commands like “book a 30-minute with Carlos at 12:30 today.” Cool. Add this natural-language command route so the agent parses your text (or voice transcript) and does the work end-to-end.
+
+Below is a drop-in extension to the Option-B package you already added. It’s additive, isolated, and doesn’t touch your other pipelines.
+
+1) Add a lightweight NLP parser
+npm i chrono-node
+
+Why: rock-solid date/time parsing (“today 12:30”, “tomorrow 3pm”, “next Tue 10–11”).
+
+2) New files
+src/modules/calendarMulti/nlp.ts
+import chrono from "chrono-node";
+
+export type ParsedCommand =
+  | { intent: "schedule"; title: string; date: string; preferredHHmm?: string; durationMins: number; attendeeAlias?: string }
+  | { intent: "find_free"; date: string; durationMins: number; attendeeAlias?: string };
+
+const DFLT_TITLE = "Meeting";
+const DUR_DEFAULT = 30;
+
+function clampDuration(mins?: number) {
+  if (!mins || !Number.isFinite(mins)) return DUR_DEFAULT;
+  return Math.max(10, Math.min(240, Math.round(mins)));
+}
+
+function toISODate(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+function toHHmm(d: Date) {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+export function parseCommand(text: string, now = new Date()): ParsedCommand | null {
+  const s = text.trim().toLowerCase();
+
+  // Rough intent classification
+  const wantsFind =
+    /(^|\b)(find|look|search)\b.*\b(free|available)\b/.test(s) ||
+    /\bwhen\b.*\b(free|available)\b/.test(s);
+
+  // Duration extraction
+  let durationMins: number | undefined;
+  const durMatch =
+    s.match(/\b(\d+)\s*(min|mins|minutes)\b/) ||
+    s.match(/\b(\d+)\s*(hr|hrs|hour|hours)\b/);
+  if (durMatch) {
+    const n = Number(durMatch[1]);
+    const unit = durMatch[2];
+    durationMins = /hr/.test(unit) ? n * 60 : n;
+  } else if (/\bhalf\s*hour\b/.test(s) || /\b30\s*min\b/.test(s)) {
+    durationMins = 30;
+  }
+
+  // Title extraction (very simple heuristic: words after "called|titled|for" or default)
+  let title = DFLT_TITLE;
+  const titleMatch = s.match(/\b(called|titled|for)\s+([^,]{3,80})/);
+  if (titleMatch) {
+    title = titleMatch[2].trim();
+  } else if (s.startsWith("create ") || s.startsWith("schedule ")) {
+    // e.g., "create a team meeting ..."
+    const m = s.match(/create|schedule\s+(a\s+)?([^,]{3,80})/);
+    if (m && m[2]) title = m[2].replace(/\b(meeting|event)\b/i, "").trim() || DFLT_TITLE;
+  }
+
+  // Attendee alias: quoted or after "with"
+  let attendeeAlias: string | undefined;
+  const quoted = s.match(/"([^"]+)"/);
+  if (quoted) attendeeAlias = quoted[1].trim();
+  if (!attendeeAlias) {
+    const withMatch = s.match(/\bwith\s+([a-z0-9._\-@ ]{2,60})/);
+    if (withMatch) attendeeAlias = withMatch[1].trim();
+  }
+
+  // Date/time via chrono
+  const results = chrono.parse(s, now);
+  let dateISO = toISODate(now);
+  let hhmm: string | undefined;
+  if (results.length) {
+    const r = results[0];
+    const start = r.start?.date();
+    if (start) {
+      dateISO = toISODate(start);
+      // If user gave a time, lock it; else leave undefined (we’ll search free slots)
+      if (r.start.isCertain("hour") || r.start.isCertain("minute")) {
+        hhmm = toHHmm(start);
+      }
+    }
+  }
+
+  durationMins = clampDuration(durationMins);
+
+  if (wantsFind || (!hhmm && /find|free|slot|availability/.test(s))) {
+    return { intent: "find_free", date: dateISO, durationMins, attendeeAlias };
+  }
+
+  // default: schedule
+  return {
+    intent: "schedule",
+    title: title || DFLT_TITLE,
+    date: dateISO,
+    preferredHHmm: hhmm,
+    durationMins,
+    attendeeAlias
+  };
+}
+
+src/modules/calendarMulti/aliases.ts
+
+Simple alias store so “colleague calendar” → email or ICS.
+
+import Database from "better-sqlite3";
+
+const db = new Database("calendar_aliases.db");
+db.exec(`
+CREATE TABLE IF NOT EXISTS aliases (
+  alias TEXT PRIMARY KEY,
+  email TEXT,
+  ics_url TEXT,
+  updated_at INTEGER NOT NULL
+);
+`);
+
+export function upsertAlias(alias: string, email?: string, icsUrl?: string) {
+  const now = Date.now();
+  const stmt = db.prepare("INSERT INTO aliases(alias,email,ics_url,updated_at) VALUES(?,?,?,?) ON CONFLICT(alias) DO UPDATE SET email=excluded.email, ics_url=excluded.ics_url, updated_at=excluded.updated_at");
+  stmt.run(alias.toLowerCase(), email || null, icsUrl || null, now);
+}
+
+export function getAlias(alias: string): { email?: string; ics_url?: string } | null {
+  const row = db.prepare("SELECT email, ics_url FROM aliases WHERE alias=?").get(alias.toLowerCase());
+  return row || null;
+}
+
+export function listAliases() {
+  return db.prepare("SELECT alias,email,ics_url,updated_at FROM aliases ORDER BY alias").all();
+}
+
+3) Extend the router with a command endpoint
+src/modules/calendarMulti/index.ts (additions only)
+// NEW imports at top:
+import { parseCommand } from "./nlp.js";
+import { getAlias, upsertAlias, listAliases } from "./aliases.js";
+
+// NEW: upsert/list alias endpoints (so you can teach the agent names once)
+router.post("/alias/upsert", async (req, res) => {
+  const { alias, email, icsUrl } = req.body ?? {};
+  if (!alias) return res.status(400).json({ error: "alias required" });
+  if (!email && !icsUrl) return res.status(400).json({ error: "email or icsUrl required" });
+  upsertAlias(String(alias), email ? String(email) : undefined, icsUrl ? String(icsUrl) : undefined);
+  res.json({ ok: true });
+});
+
+router.get("/alias/list", (_req, res) => {
+  res.json({ aliases: listAliases() });
+});
+
+// NEW: natural-language command endpoint
+// Body: { userId: string, text: string, tz?: string, workHours?: {start,end} }
+router.post("/command", async (req, res) => {
+  try {
+    const { userId, text, tz = "America/Los_Angeles", workHours } = req.body ?? {};
+    if (!userId || !text) return res.status(400).json({ error: "userId and text required" });
+
+    const parsed = parseCommand(String(text));
+    if (!parsed) return res.status(400).json({ error: "Could not understand command" });
+
+    if (parsed.intent === "find_free") {
+      // resolve attendee
+      let attendeeMode: "none" | "ics" | "api" = "none";
+      let attendeeValue: string | undefined;
+      let attendeeEmail: string | undefined;
+
+      if (parsed.attendeeAlias) {
+        const hit = getAlias(parsed.attendeeAlias);
+        if (hit?.ics_url) { attendeeMode = "ics"; attendeeValue = hit.ics_url; }
+        if (hit?.email) { attendeeEmail = hit.email; if (attendeeMode === "none") attendeeMode = "api"; attendeeValue = hit.email; }
+      }
+
+      // Reuse existing endpoints internally: compute mutual free then return suggestions
+      // We’ll piggyback on /attendee/freebusy if attendee known; otherwise return user’s free via FreeBusy
+
+      // Quick approach: call schedule flow in "dry run"? If you want zero duplication, add a dry-run param.
+      // For clarity here, just say "ask the UI to call attendee/freebusy" OR schedule with no preferred time.
+
+      return res.json({
+        intent: parsed.intent,
+        request: {
+          date: parsed.date,
+          durationMins: parsed.durationMins,
+          tz,
+          workHours,
+          attendee: { mode: attendeeMode, value: attendeeValue, email: attendeeEmail }
+        },
+        next: "Call /calendar-multi/attendee/freebusy (if attendee set) then pick a slot; or call /calendar-multi/schedule without preferredStart to auto-pick first fit."
+      });
+    }
+
+    // intent === schedule
+    let attendeeMode: "none" | "ics" | "api" = "none";
+    let attendeeValue: string | undefined;
+    let attendeeEmail: string | undefined;
+    if (parsed.attendeeAlias) {
+      const hit = getAlias(parsed.attendeeAlias);
+      if (hit?.ics_url) { attendeeMode = "ics"; attendeeValue = hit.ics_url; }
+      if (hit?.email) { attendeeEmail = hit.email; if (attendeeMode === "none") { attendeeMode = "api"; attendeeValue = hit.email; } }
+    }
+
+    // Build the same payload the form would send, then schedule immediately
+    const payload = {
+      userId,
+      title: parsed.title,
+      description: "",
+      location: "",
+      date: parsed.date,
+      preferredStart: parsed.preferredHHmm, // can be undefined → auto-pick
+      durationMins: parsed.durationMins,
+      tz,
+      workHours,
+      attendee: { mode: attendeeMode, value: attendeeValue, email: attendeeEmail }
+    };
+
+    // Call our own /schedule logic directly (no HTTP hop)
+    // NOTE: We’re inside the same module, so we’ll duplicate a tiny fragment to avoid circular import.
+    // If you prefer, refactor schedule into a service fn and reuse.
+    req.body = payload;
+    // @ts-ignore reusing handler:
+    return router.handle({ ...req, url: "/schedule", method: "POST" } as any, res as any, () => {});
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+If you prefer not to reuse router.handle, extract your existing schedule logic into a scheduleService(payload) function and call it from both /schedule and /command. Same outcome, cleaner layering.
+
+4) How you’ll use it (examples)
+
+Teach the agent your colleague once:
+
+curl -X POST https://<your-app>/calendar-multi/alias/upsert \
+  -H "Content-Type: application/json" \
+  -d '{"alias":"colleague calendar","email":"colleague@company.com","icsUrl":"https://calendar.google.com/calendar/ical/.../basic.ics"}'
+
+
+Now talk to it:
+
+Schedule by voice/text (with time):
+
+POST /calendar-multi/command
+{
+  "userId":"USER-123",
+  "text":"create a team meeting today at 12:30 with \"colleague calendar\" for 30 minutes",
+  "tz":"America/Vancouver",
+  "workHours":{"start":"09:00","end":"18:00"}
+}
+
+
+→ It resolves date/time/duration/attendee, calls the scheduler, and returns {eventId, htmlLink, start, end, ...}.
+
+Find a free slot (no time given):
+
+POST /calendar-multi/command
+{
+  "userId":"USER-123",
+  "text":"find a free 45 minute slot tomorrow with colleague calendar",
+  "tz":"America/Vancouver"
+}
+
+
+→ Returns a “next” plan plus the computed request you can feed to /attendee/freebusy or just call /schedule without preferredStart to auto-pick the first fit.
+
+5) UI (one small change)
+
+Add a single input at the top of your “Calendar Agent (Beta)” panel:
+
+Label: Quick Command
+
+Placeholder: “book a 30 min with colleague calendar at 12:30 today”
+
+Button: Run
+
+It POSTs to /calendar-multi/command with { userId, text, tz, workHours }.
+
+If the response includes eventId, show the success chip with the Google link.
+
+If it returns a “next” plan (find_free), offer a button Auto-Pick First Fit that calls /calendar-multi/schedule with the suggested payload (no preferredStart).
+
+6) Why this solves your pain
+
+You can speak or type one line; the agent does the searching + posting.
+
+Ambiguity handled: if no time is given, it finds a mutual free slot; if you give a time, it schedules directly.
+
+No collisions: stays inside /calendar-multi/* and uses the same proven schedule/free logic.
+
+Cheap and reliable: chrono-node handles date math; no LLM tokens needed for parsing.
+
+If you want me to refactor the schedule logic into a shared service.ts to avoid the tiny handler reuse trick, say the word—I’ll drop the exact file so both /schedule and /command call the same function.
