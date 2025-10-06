@@ -15,6 +15,7 @@ import {
   ChatMessage,
 } from "@/lib/types";
 import { nanoid } from "nanoid";
+import { callOrchestrator, isActionIntent } from "@/lib/orchestrator";
 
 // ---------- persist keys between reloads ----------
 const storedKeys = JSON.parse(
@@ -76,9 +77,11 @@ export default function Home() {
       // Normal voice input - append to chat input
       setChatInput((prev) => prev + (prev ? " " : "") + text);
     },
-    (text) => {
+    async (text) => {
       // Car Mode auto-send callback (triggered after 3 seconds of silence)
       if (!text.trim()) return;
+
+      const userId = sessionId;
 
       // Store user message
       setUserMessages((prev) => [
@@ -92,7 +95,37 @@ export default function Home() {
         },
       ]);
 
-      // Send to server
+      // Call orchestrator first
+      const orchResult = await callOrchestrator({
+        userId,
+        text,
+        voice: true,
+        sessionId,
+        apiKeys,
+      });
+
+      console.log('[Orchestrator] Car Mode Result:', orchResult);
+
+      // If orchestrator handled it (action intent), add response
+      if (isActionIntent(orchResult.intent || orchResult.detectedIntent || '')) {
+        const responseContent = orchResult.followup || orchResult.actionTaken;
+        setUserMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: responseContent,
+            timestamp: new Date(),
+            status: "completed",
+          },
+        ]);
+
+        // Always speak in car mode
+        speak(responseContent);
+        return;
+      }
+
+      // Otherwise, fall back to generic chat via WebSocket
       sendMessage({
         type: "chat",
         data: {
@@ -129,8 +162,11 @@ export default function Home() {
   }, [wsMessages, voiceEnabled, isCarMode, speak]);
 
   // ---------- handlers ----------
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
+
+    const userMessage = chatInput;
+    const userId = sessionId; // Use sessionId as userId for orchestrator
 
     // store user message locally for immediate display
     setUserMessages((prev) => [
@@ -138,27 +174,58 @@ export default function Home() {
       {
         id: crypto.randomUUID(),
         role: "user",
-        content: chatInput,
+        content: userMessage,
         timestamp: new Date(),
         status: "completed",
       },
     ]);
 
-    // send to server with conversation history for context (optimized - only essential data)
+    setChatInput("");
+
+    // Call orchestrator first
+    const orchResult = await callOrchestrator({
+      userId,
+      text: userMessage,
+      voice: false,
+      sessionId,
+      apiKeys,
+    });
+
+    console.log('[Orchestrator] Result:', orchResult);
+
+    // If orchestrator handled it (action intent), add response and don't send to WS
+    if (isActionIntent(orchResult.intent || orchResult.detectedIntent || '')) {
+      const responseContent = orchResult.followup || orchResult.actionTaken;
+      setUserMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: responseContent,
+          timestamp: new Date(),
+          status: "completed",
+        },
+      ]);
+
+      if (orchResult.followup && voiceEnabled) {
+        speak(orchResult.followup);
+      }
+      return;
+    }
+
+    // Otherwise, fall back to generic chat via WebSocket
     sendMessage({
       type: "chat",
       data: {
         sessionId,
-        content: chatInput,
+        content: userMessage,
         persona,
         tone,
         contentAgentEnabled,
         apiKeys,
-        conversationHistory: allMessages.slice(-6).map(m => ({ role: m.role, content: m.content })), // last 6 messages, minimal data
+        conversationHistory: allMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
       },
     });
-
-    setChatInput("");
   };
 
   const [showCalendarPanel, setShowCalendarPanel] = useState(false);
