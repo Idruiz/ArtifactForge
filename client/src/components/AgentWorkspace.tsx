@@ -23,6 +23,7 @@ import {
   Globe,
   TrendingUp,
   ArrowDown,
+  Calendar,
 } from "lucide-react";
 import type {
   AgentStatus,
@@ -232,6 +233,22 @@ export function AgentWorkspace(p: Props) {
                   {label}
                 </Button>
               ))}
+              
+              <div className="pt-2 mt-2 border-t border-gray-200">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => p.onQuickAction("calendar")}
+                  className="w-full justify-start text-blue-600 border-blue-200 hover:bg-blue-50"
+                  data-testid="button-quick-calendar"
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Calendar Agent
+                  <Badge variant="secondary" className="ml-auto text-[10px] px-1.5">
+                    Beta
+                  </Badge>
+                </Button>
+              </div>
             </div>
           </div>
         </ResizablePanel>

@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { ChatPanel } from "@/components/ChatPanel";
 import { AgentWorkspace } from "@/components/AgentWorkspace";
 import { ApiKeysModal } from "@/components/ApiKeysModal";
+import { CalendarPanel } from "@/components/CalendarPanel";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useVoice } from "@/hooks/useVoice";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ApiKeys,
   Persona,
@@ -159,7 +161,14 @@ export default function Home() {
     setChatInput("");
   };
 
+  const [showCalendarPanel, setShowCalendarPanel] = useState(false);
+
   const handleQuickAction = (action: string) => {
+    if (action === "calendar") {
+      setShowCalendarPanel(true);
+      return;
+    }
+
     const prompts: Record<string, string> = {
       presentation:
         "Create a professional PPTX presentation about [YOUR TOPIC] with slides including charts and images",
@@ -279,6 +288,15 @@ export default function Home() {
         apiKeys={apiKeys}
         onSave={handleSaveApiKeys}
       />
+
+      <Dialog open={showCalendarPanel} onOpenChange={setShowCalendarPanel}>
+        <DialogContent className="max-w-3xl max-h-[90vh] p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>Calendar Agent (Beta)</DialogTitle>
+          </DialogHeader>
+          <CalendarPanel userId={sessionId} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

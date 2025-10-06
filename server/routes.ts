@@ -288,5 +288,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Calendar proxy routes (isolated, additive module)
   app.use("/calendar-proxy", calendarProxyRouter);
 
+  // Calendar config endpoint (provides env vars to frontend)
+  app.get("/api/calendar/config", (_req, res) => {
+    res.json({
+      webAppUrl: process.env.GAS_WEB_APP_URL || "",
+      sharedToken: process.env.GAS_SHARED_TOKEN || "",
+    });
+  });
+
   return httpServer;
 }
