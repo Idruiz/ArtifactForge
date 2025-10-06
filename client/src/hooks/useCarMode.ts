@@ -19,6 +19,7 @@ export function useCarMode(
   const vadTimerRef = useRef<number | null>(null);
   const meterRef = useRef<ScriptProcessorNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const lastSpeechTimeRef = useRef<number>(0);
 
   const vadSilenceMs = 3000; // 3 seconds as requested
 
@@ -56,30 +57,46 @@ export function useCarMode(
         }
         const energy = Math.sqrt(sum / buf.length);
         const speaking = energy > 0.008 && zc > 15;
+        const now = performance.now();
 
-        if (speaking && !vadActiveRef.current) {
-          vadActiveRef.current = true;
-          chunksRef.current = [];
-          rec.start();
-          console.log("🎙️ voice detected");
-          if (vadTimerRef.current) { window.clearTimeout(vadTimerRef.current); vadTimerRef.current = null; }
-        } else if (!speaking && vadActiveRef.current) {
-          if (!vadTimerRef.current) {
-            vadTimerRef.current = window.setTimeout(() => {
-              vadActiveRef.current = false;
+        if (speaking) {
+          // Update last speech timestamp
+          lastSpeechTimeRef.current = now;
+          
+          if (!vadActiveRef.current) {
+            vadActiveRef.current = true;
+            chunksRef.current = [];
+            // Start recording when voice detected
+            if (rec.state === "inactive") {
+              rec.start();
+              console.log("🎙️ voice detected - recording started");
+            }
+          }
+        } else if (vadActiveRef.current) {
+          // Check if we've had sustained silence (3 seconds since last speech)
+          const silenceDuration = now - lastSpeechTimeRef.current;
+          
+          if (silenceDuration >= vadSilenceMs) {
+            // Sustained silence detected - stop recording
+            vadActiveRef.current = false;
+            if (rec.state === "recording") {
               try { rec.stop(); } catch {}
-              console.log("🛑 silence — sending chunk");
-              vadTimerRef.current = null;
-            }, vadSilenceMs) as any;
+              console.log(`🛑 sustained ${(silenceDuration/1000).toFixed(1)}s silence — sending chunk`);
+            }
           }
         }
       };
 
+      // Connect VAD to audio graph without feedback (using zero-gain node)
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = 0; // Silence output to prevent feedback
+      
       src.connect(meter);
-      meter.connect(ctx.destination);
-
+      meter.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
       setIsCarMode(true);
-      console.log("[Car Mode] Started with 3s pause detection");
+      console.log("[Car Mode] Started with 3s pause detection - speak to begin");
     } catch (e: any) {
       console.error("[Car Mode] Error:", e.message);
     }
@@ -87,10 +104,33 @@ export function useCarMode(
 
   function stopCarMode() {
     setIsCarMode(false);
+    
+    // Clear VAD timer to prevent stray callbacks
+    if (vadTimerRef.current) {
+      window.clearTimeout(vadTimerRef.current);
+      vadTimerRef.current = null;
+    }
+    
+    vadActiveRef.current = false;
+    
+    // Flush any pending audio before stopping
+    if (recRef.current && recRef.current.state === "recording") {
+      try { 
+        recRef.current.stop(); // This will trigger onstop -> flushChunk
+      } catch {}
+    }
+    
+    // Clean up all resources and set refs to null
     if (meterRef.current) { meterRef.current.disconnect(); meterRef.current = null; }
     if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch {} audioCtxRef.current = null; }
-    if (recRef.current && recRef.current.state !== "inactive") { try { recRef.current.stop(); } catch {} }
     if (mediaRef.current) { mediaRef.current.getTracks().forEach(t => t.stop()); mediaRef.current = null; }
+    
+    // CRITICAL: Set recRef to null so new MediaRecorder is created on restart
+    recRef.current = null;
+    
+    // Cancel any ongoing speech to prevent overlap
+    try { window.speechSynthesis.cancel(); } catch {}
+    
     console.log("[Car Mode] Stopped");
   }
 
@@ -103,7 +143,7 @@ export function useCarMode(
       return;
     }
     
-    if (!isCarMode) return;
+    // Don't skip if Car Mode was just turned off - we want the final chunk
 
     console.log(`📤 sending ${blob.size} bytes to STT...`);
     
@@ -132,6 +172,8 @@ export function useCarMode(
 
   const speak = useCallback((msg: string) => {
     try {
+      // Cancel any ongoing speech to prevent overlap
+      window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(msg);
       window.speechSynthesis.speak(u);
     } catch {}
