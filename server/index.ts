@@ -5,6 +5,7 @@ import fs from "fs";
 
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import carModeV2 from "./modules/carModeV2/index.js";
 
 const app = express();
 app.use(express.json());
@@ -78,6 +79,10 @@ app.use("/sites", sitesRouter);
 (async () => {
   // Register API routes FIRST, before Vite
   const server = await registerRoutes(app);
+  
+  // ────────── Car Mode V2 ──────────
+  app.use("/car-v2", carModeV2);
+  log("[CARV2] POST /car-v2/stt");
   
   // ────────── Generated Sites Listing API ──────────
   app.get("/api/sites", async (_req, res) => {
