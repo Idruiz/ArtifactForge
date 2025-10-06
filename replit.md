@@ -62,32 +62,50 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (October 6, 2025)
 
-### CALENDAR AGENT INTEGRATION (Latest)
-**Feature**: Added isolated Calendar Agent module for Google Calendar scheduling via Apps Script proxy
-**Implementation**: Server-side only integration, no client-side Google API calls
+### CALENDAR AGENT INTEGRATION (Latest - Command-Based Interface)
+**Feature**: Hands-free natural language calendar scheduling via Google Apps Script proxy
+**Implementation**: Server-side only integration with chrono-node NLP parsing, no client-side Google API calls
 
 **Architecture**:
 - **Module Structure**: `server/modules/calendarProxy/` (isolated, additive)
-  - `db.ts` - SQLite storage for user connectors (user_id → GAS credentials)
-  - `schemas.ts` - Zod validation schemas for all inputs
+  - `db.ts` - SQLite storage for user connectors (user_id → GAS credentials) and contact aliases
+  - `schemas.ts` - Zod validation schemas for all inputs (CommandSchema, AliasUpsertSchema)
   - `gasClient.ts` - Google Apps Script proxy communication
-  - `router.ts` - Express router with register/free/schedule endpoints
+  - `nlp.ts` - Natural language parsing with chrono-node (extracts intent, datetime, duration, attendee)
+  - `calendarService.ts` - Shared scheduling logic consumed by /schedule and /command endpoints
+  - `router.ts` - Express router with register/free/schedule/command/alias endpoints
 - **Database**: SQLite at `data/calendar_proxy.db`
+  - Tables: `user_connectors`, `aliases` (alias → email/ICS URL mapping)
 - **Routes**:
   - `POST /calendar-proxy/register` - Register user's GAS web app URL + shared token
+  - `POST /calendar-proxy/command` - Natural language command processing (schedule or find_free intent)
   - `POST /calendar-proxy/free` - Get available time slots
   - `POST /calendar-proxy/schedule` - Create calendar event
+  - `POST /calendar-proxy/alias/upsert` - Save contact alias
+  - `GET /calendar-proxy/alias/list` - List all saved aliases
   - `GET /api/calendar/config` - Fetch GAS credentials from env vars
 
+**Natural Language Processing**:
+- **chrono-node**: Battle-tested datetime parsing ("today 12:30", "tomorrow 3pm", "next Tue 10-11")
+- **Intent Detection**: Regex-based classification (find_free vs schedule)
+- **Entity Extraction**: Duration (30 min, 1 hr), attendee alias ("with colleague calendar"), title
+- **Alias Resolution**: Maps spoken names to attendee emails or ICS URLs for multi-calendar free/busy
+
 **UI Integration**:
-- **Left Sidebar**: "Calendar Agent (Beta)" button added below "Analyze" in Quick Actions
+- **Left Sidebar**: "Calendar Agent (Beta)" button below "Analyze" in Quick Actions
   - Blue theme with Calendar icon and Beta badge
   - Opens dialog panel on click
 - **CalendarPanel Component**: (`client/src/components/CalendarPanel.tsx`)
-  - Connection flow: Fetch config → Register GAS credentials → Enable scheduling
-  - Form fields: title, date, time, duration, attendee email, coworker ICS URL
-  - Actions: Find Free Slots, Schedule Event
-  - Results display: Free slots cards, event creation confirmation
+  - **Command Input**: Single text field for natural language commands with voice button
+  - **Voice Integration**: Uses existing useVoice hook for hands-free commands
+  - **Alias Management**: Add/list contact aliases for use in commands
+  - **Results Display**: Event creation confirmation with Google Calendar link, free slot suggestions with auto-book
+  - **Example Commands**: "schedule team meeting tomorrow at 3pm 60 min", "find free 30 min slot with colleague calendar"
+
+**Example Usage**:
+1. **Direct Scheduling**: "book a 30 min with Carlos at 12:30 today" → Immediately schedules event
+2. **Find Free Slots**: "find free 45 min tomorrow with colleague calendar" → Returns suggestions with auto-book button
+3. **Teach Aliases**: Add "colleague calendar" → carlos@company.com, then use "with colleague calendar" in commands
 
 **Environment Variables**:
 - `GAS_WEB_APP_URL` - Google Apps Script deployed web app URL
@@ -98,6 +116,7 @@ Preferred communication style: Simple, everyday language.
 - No browser-based Google API calls (no CORS issues)
 - Credentials stored in Replit Secrets
 - Per-user connector registration with isolated data
+- Alias system prevents exposing raw emails in voice commands
 
 ## Recent Updates (October 3, 2025)
 
