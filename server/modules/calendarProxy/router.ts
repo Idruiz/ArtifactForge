@@ -94,7 +94,7 @@ router.post("/command", async (req: Request, res: Response) => {
     console.log("[CAL] POST /calendar-proxy/command");
     const input = CommandSchema.parse(req.body);
     
-    const parsed = parseCommand(input.text);
+    const parsed = await parseCommand(input.text);
     if (!parsed) {
       return res.status(400).json({ error: "Could not understand command. Try: 'book a 30 min meeting with colleague at 2pm today'" });
     }

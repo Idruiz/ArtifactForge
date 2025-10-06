@@ -1,5 +1,3 @@
-import * as chrono from "chrono-node";
-
 export type ParsedCommand =
   | { intent: "schedule"; title: string; date: string; preferredHHmm?: string; durationMins: number; attendeeAlias?: string }
   | { intent: "find_free"; date: string; durationMins: number; attendeeAlias?: string };
@@ -23,7 +21,9 @@ function toHHmm(d: Date) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-export function parseCommand(text: string, now = new Date()): ParsedCommand | null {
+export async function parseCommand(text: string, now = new Date()): Promise<ParsedCommand | null> {
+  // Lazy import to avoid blocking event loop at startup
+  const chrono = await import("chrono-node");
   const s = text.trim().toLowerCase();
 
   // Rough intent classification
