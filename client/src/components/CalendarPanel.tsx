@@ -1,38 +1,43 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Clock, Users, Link as LinkIcon, CheckCircle2, AlertCircle } from "lucide-react";
+import { Calendar, Mic, MicOff, Send, Link as LinkIcon, CheckCircle2, Clock, Users, Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useVoice } from "@/hooks/useVoice";
 
 interface CalendarPanelProps {
   userId: string;
 }
 
-interface FreeSlot {
-  start: string;
-  end: string;
+interface Alias {
+  alias: string;
+  email?: string;
+  icsUrl?: string;
 }
 
 export function CalendarPanel({ userId }: CalendarPanelProps) {
   const { toast } = useToast();
   const [isRegistered, setIsRegistered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [freeSlots, setFreeSlots] = useState<FreeSlot[]>([]);
-  
-  const [date, setDate] = useState(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
-  });
-  const [preferredStart, setPreferredStart] = useState("09:00");
-  const [duration, setDuration] = useState(30);
-  const [attendeeEmail, setAttendeeEmail] = useState("");
-  const [coworkerICS, setCoworkerICS] = useState("");
-  const [title, setTitle] = useState("");
+  const [command, setCommand] = useState("");
   const [eventResult, setEventResult] = useState<any>(null);
+  const [findFreeResult, setFindFreeResult] = useState<any>(null);
+  const [aliases, setAliases] = useState<Alias[]>([]);
+  const [showAliasForm, setShowAliasForm] = useState(false);
+  const [newAlias, setNewAlias] = useState({ alias: "", email: "", icsUrl: "" });
+  
+  const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Voice integration
+  const { isListening, startListening, stopListening } = useVoice(
+    (text: string) => {
+      setCommand(text);
+      inputRef.current?.focus();
+    }
+  );
 
   const handleConnect = async () => {
     setIsLoading(true);
@@ -56,6 +61,7 @@ export function CalendarPanel({ userId }: CalendarPanelProps) {
       });
 
       setIsRegistered(true);
+      loadAliases();
       toast({
         title: "Success",
         description: "Calendar connected successfully!",
@@ -71,74 +77,46 @@ export function CalendarPanel({ userId }: CalendarPanelProps) {
     }
   };
 
-  const handleFindFreeSlots = async () => {
-    setIsLoading(true);
-    setFreeSlots([]);
+  const loadAliases = async () => {
     try {
-      const response = await apiRequest("POST", "/calendar-proxy/free", {
-        userId,
-        date,
-        durationMins: duration,
-        tz: "America/Los_Angeles",
-        workHours: { start: "09:00", end: "18:00" },
-        coworkerICS: coworkerICS || undefined,
-      });
-
+      const response = await apiRequest("GET", "/calendar-proxy/alias/list");
       const data = await response.json();
-      setFreeSlots(data.free || []);
-      
-      toast({
-        title: "Free Slots Found",
-        description: `Found ${data.free?.length || 0} available time slots`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Search Failed",
-        description: error.message || "Failed to find free slots",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      setAliases(data.aliases || []);
+    } catch (error) {
+      console.error("Failed to load aliases:", error);
     }
   };
 
-  const handleSchedule = async () => {
-    if (!title.trim()) {
+  const handleAddAlias = async () => {
+    if (!newAlias.alias.trim() || (!newAlias.email.trim() && !newAlias.icsUrl.trim())) {
       toast({
         title: "Validation Error",
-        description: "Please enter an event title",
+        description: "Please provide an alias name and either an email or ICS URL",
         variant: "destructive",
       });
       return;
     }
 
     setIsLoading(true);
-    setEventResult(null);
     try {
-      const response = await apiRequest("POST", "/calendar-proxy/schedule", {
-        userId,
-        title,
-        description: "Scheduled via Calendar Agent",
-        date,
-        preferredStart,
-        durationMins: duration,
-        tz: "America/Los_Angeles",
-        workHours: { start: "09:00", end: "18:00" },
-        attendeeEmail: attendeeEmail || undefined,
-        coworkerICS: coworkerICS || undefined,
+      await apiRequest("POST", "/calendar-proxy/alias/upsert", {
+        alias: newAlias.alias,
+        email: newAlias.email || undefined,
+        icsUrl: newAlias.icsUrl || undefined,
       });
 
-      const data = await response.json();
-      setEventResult(data);
-      
       toast({
-        title: "Event Scheduled",
-        description: `Event "${title}" created successfully!`,
+        title: "Alias Saved",
+        description: `You can now use "${newAlias.alias}" in your commands`,
       });
+
+      setNewAlias({ alias: "", email: "", icsUrl: "" });
+      setShowAliasForm(false);
+      loadAliases();
     } catch (error: any) {
       toast({
-        title: "Scheduling Failed",
-        description: error.message || "Failed to schedule event",
+        title: "Failed to Save Alias",
+        description: error.message || "Could not save alias",
         variant: "destructive",
       });
     } finally {
@@ -146,25 +124,121 @@ export function CalendarPanel({ userId }: CalendarPanelProps) {
     }
   };
 
+  const handleCommand = async () => {
+    if (!command.trim()) return;
+
+    setIsLoading(true);
+    setEventResult(null);
+    setFindFreeResult(null);
+    
+    try {
+      const response = await apiRequest("POST", "/calendar-proxy/command", {
+        userId,
+        text: command,
+        tz: "America/Los_Angeles",
+        workHours: { start: "09:00", end: "18:00" },
+      });
+
+      const data = await response.json();
+
+      if (data.intent === "schedule" && data.success) {
+        setEventResult(data.event);
+        toast({
+          title: "Event Scheduled",
+          description: `Successfully created: ${data.event.title || "Meeting"}`,
+        });
+        setCommand("");
+      } else if (data.intent === "find_free") {
+        setFindFreeResult(data);
+        toast({
+          title: "Search Request",
+          description: data.message || "Ready to find free slots",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Command Failed",
+        description: error.message || "Could not process command. Try: 'book a 30 min meeting at 2pm today'",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAutoBook = async () => {
+    if (!findFreeResult?.params) return;
+
+    setIsLoading(true);
+    try {
+      const response = await apiRequest("POST", "/calendar-proxy/free", findFreeResult.params);
+      const freeData = await response.json();
+
+      if (freeData.free && freeData.free.length > 0) {
+        const firstSlot = freeData.free[0];
+        const scheduleResponse = await apiRequest("POST", "/calendar-proxy/schedule", {
+          ...findFreeResult.params,
+          title: "Meeting",
+          description: "Auto-scheduled",
+          preferredStart: firstSlot.start.split('T')[1],
+        });
+
+        const scheduleData = await scheduleResponse.json();
+        setEventResult(scheduleData);
+        setFindFreeResult(null);
+        toast({
+          title: "Event Scheduled",
+          description: `Booked at ${firstSlot.start}`,
+        });
+      } else {
+        toast({
+          title: "No Free Slots",
+          description: "Could not find any available time",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Auto-Book Failed",
+        description: error.message || "Could not auto-schedule",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVoiceToggle = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+      toast({
+        title: "Listening...",
+        description: "Speak your calendar command",
+      });
+    }
+  };
+
   return (
-    <div className="h-full overflow-y-auto p-4 bg-slate-50">
+    <div className="h-full overflow-y-auto p-4 bg-slate-50 dark:bg-slate-900">
       <div className="max-w-2xl mx-auto space-y-4">
-        <Card>
+        <Card className="dark:bg-slate-800 dark:border-slate-700">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 dark:text-white">
               <Calendar className="w-5 h-5" />
-              Calendar Agent
+              Calendar Agent (Beta)
             </CardTitle>
-            <CardDescription>
-              Schedule meetings using your Google Calendar via Apps Script
+            <CardDescription className="dark:text-slate-400">
+              Schedule meetings using natural language commands
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {!isRegistered ? (
               <div className="space-y-3">
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-900">
-                    Connect your Google Calendar to start scheduling meetings automatically.
+                <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm text-blue-900 dark:text-blue-100">
+                    Connect your Google Calendar to start scheduling meetings with voice or text commands.
                   </p>
                 </div>
                 <Button
@@ -179,147 +253,171 @@ export function CalendarPanel({ userId }: CalendarPanelProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-green-900">Calendar connected</span>
+                <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <span className="text-sm text-green-900 dark:text-green-100">Calendar connected</span>
                 </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="event-title">Event Title</Label>
+                {/* Quick Command Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="quick-command" className="dark:text-white">
+                    Quick Command
+                  </Label>
+                  <div className="flex gap-2">
                     <Input
-                      id="event-title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Team meeting"
-                      data-testid="input-event-title"
+                      ref={inputRef}
+                      id="quick-command"
+                      value={command}
+                      onChange={(e) => setCommand(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && !isLoading && handleCommand()}
+                      placeholder='Try: "book a 30 min with colleague calendar at 2pm today"'
+                      className="flex-1 dark:bg-slate-700 dark:text-white dark:border-slate-600"
+                      disabled={isLoading}
+                      data-testid="input-quick-command"
                     />
+                    <Button
+                      onClick={handleVoiceToggle}
+                      variant={isListening ? "destructive" : "outline"}
+                      size="icon"
+                      data-testid="button-voice-toggle"
+                      className="dark:border-slate-600"
+                    >
+                      {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    </Button>
+                    <Button
+                      onClick={handleCommand}
+                      disabled={isLoading || !command.trim()}
+                      data-testid="button-run-command"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
                   </div>
+                  {isListening && (
+                    <p className="text-xs text-muted-foreground dark:text-slate-400">
+                      Listening...
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground dark:text-slate-400">
+                    Examples: "schedule team meeting tomorrow at 3pm 60 min" • "find free 30 min slot with colleague calendar"
+                  </p>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="event-date">Date</Label>
-                      <Input
-                        id="event-date"
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        data-testid="input-event-date"
-                      />
+                {/* Aliases Section */}
+                <Card className="bg-white dark:bg-slate-700 border dark:border-slate-600">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm dark:text-white">Contact Aliases</CardTitle>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setShowAliasForm(!showAliasForm)}
+                        data-testid="button-toggle-alias-form"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add
+                      </Button>
                     </div>
-                    <div>
-                      <Label htmlFor="preferred-time">Preferred Time</Label>
-                      <Input
-                        id="preferred-time"
-                        type="time"
-                        value={preferredStart}
-                        onChange={(e) => setPreferredStart(e.target.value)}
-                        data-testid="input-preferred-time"
-                      />
-                    </div>
-                  </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {showAliasForm && (
+                      <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-800 rounded border dark:border-slate-600">
+                        <Input
+                          placeholder="Alias (e.g., colleague calendar)"
+                          value={newAlias.alias}
+                          onChange={(e) => setNewAlias({ ...newAlias, alias: e.target.value })}
+                          className="dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                          data-testid="input-alias-name"
+                        />
+                        <Input
+                          placeholder="Email (optional)"
+                          type="email"
+                          value={newAlias.email}
+                          onChange={(e) => setNewAlias({ ...newAlias, email: e.target.value })}
+                          className="dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                          data-testid="input-alias-email"
+                        />
+                        <Input
+                          placeholder="ICS URL (optional)"
+                          type="url"
+                          value={newAlias.icsUrl}
+                          onChange={(e) => setNewAlias({ ...newAlias, icsUrl: e.target.value })}
+                          className="dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                          data-testid="input-alias-ics"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={handleAddAlias}
+                          disabled={isLoading}
+                          className="w-full"
+                          data-testid="button-save-alias"
+                        >
+                          Save Alias
+                        </Button>
+                      </div>
+                    )}
+                    {aliases.length > 0 ? (
+                      <div className="space-y-1">
+                        {aliases.map((alias, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded text-sm"
+                            data-testid={`alias-item-${idx}`}
+                          >
+                            <Users className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                            <span className="font-medium dark:text-white">{alias.alias}</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                              {alias.email || alias.icsUrl}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground dark:text-slate-400">
+                        No aliases yet. Add contacts to use in commands.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
 
-                  <div>
-                    <Label htmlFor="duration">Duration (minutes)</Label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      value={duration}
-                      onChange={(e) => setDuration(parseInt(e.target.value) || 30)}
-                      min={15}
-                      step={15}
-                      data-testid="input-duration"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="attendee-email">Attendee Email (optional)</Label>
-                    <Input
-                      id="attendee-email"
-                      type="email"
-                      value={attendeeEmail}
-                      onChange={(e) => setAttendeeEmail(e.target.value)}
-                      placeholder="colleague@example.com"
-                      data-testid="input-attendee-email"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="coworker-ics">Coworker ICS URL (optional)</Label>
-                    <Input
-                      id="coworker-ics"
-                      type="url"
-                      value={coworkerICS}
-                      onChange={(e) => setCoworkerICS(e.target.value)}
-                      placeholder="https://..."
-                      data-testid="input-coworker-ics"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleFindFreeSlots}
-                    disabled={isLoading}
-                    variant="outline"
-                    className="flex-1"
-                    data-testid="button-find-free"
-                  >
-                    <Clock className="w-4 h-4 mr-2" />
-                    Find Free Slots
-                  </Button>
-                  <Button
-                    onClick={handleSchedule}
-                    disabled={isLoading || !title.trim()}
-                    className="flex-1"
-                    data-testid="button-schedule"
-                  >
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Schedule
-                  </Button>
-                </div>
-
-                {freeSlots.length > 0 && (
-                  <Card className="bg-white">
+                {/* Find Free Result */}
+                {findFreeResult && (
+                  <Card className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Available Slots</CardTitle>
+                      <CardTitle className="text-sm flex items-center gap-2 text-amber-900 dark:text-amber-100">
+                        <Clock className="w-4 h-4" />
+                        Free Slot Search
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      {freeSlots.slice(0, 3).map((slot, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between p-2 bg-slate-50 rounded border"
-                        >
-                          <span className="text-sm">
-                            {slot.start.split('T')[1]} - {slot.end.split('T')[1]}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setPreferredStart(slot.start.split('T')[1])}
-                            data-testid={`button-select-slot-${idx}`}
-                          >
-                            Select
-                          </Button>
-                        </div>
-                      ))}
+                      <p className="text-sm text-amber-900 dark:text-amber-100">
+                        {findFreeResult.message}
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={handleAutoBook}
+                        disabled={isLoading}
+                        data-testid="button-auto-book"
+                      >
+                        Auto-Book First Available
+                      </Button>
                     </CardContent>
                   </Card>
                 )}
 
+                {/* Event Result */}
                 {eventResult && (
-                  <Card className="bg-green-50 border-green-200">
+                  <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm flex items-center gap-2 text-green-900">
+                      <CardTitle className="text-sm flex items-center gap-2 text-green-900 dark:text-green-100">
                         <CheckCircle2 className="w-4 h-4" />
                         Event Created
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      <p className="text-sm">
-                        <strong>Title:</strong> {eventResult.title}
+                      <p className="text-sm text-green-900 dark:text-green-100">
+                        <strong>Title:</strong> {eventResult.title || "Meeting"}
                       </p>
-                      <p className="text-sm">
+                      <p className="text-sm text-green-900 dark:text-green-100">
                         <strong>Time:</strong> {eventResult.start} - {eventResult.end}
                       </p>
                       {eventResult.htmlLink && (
@@ -327,7 +425,8 @@ export function CalendarPanel({ userId }: CalendarPanelProps) {
                           href={eventResult.htmlLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                          data-testid="link-calendar-event"
                         >
                           <LinkIcon className="w-3 h-3" />
                           View in Google Calendar
