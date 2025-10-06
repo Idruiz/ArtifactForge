@@ -41,6 +41,7 @@ export const agentTasks = pgTable("agent_tasks", {
 export const artifacts = pgTable("artifacts", {
   id: serial("id").primaryKey(),
   taskId: text("task_id").notNull(),
+  conversationId: text("conversation_id"),
   filename: text("filename").notNull(),
   fileType: text("file_type").notNull(),
   fileSize: integer("file_size").notNull(),
@@ -56,6 +57,23 @@ export const logs = pgTable("logs", {
   logType: text("log_type").notNull(), // 'trace' | 'step_start' | 'step_end' | 'delivery'
   message: text("message").notNull(),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const conversations = pgTable("conversations", {
+  id: text("id").primaryKey(),
+  userId: text("user_id"),
+  title: text("title").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const conversationMessages = pgTable("conversation_messages", {
+  id: serial("id").primaryKey(),
+  conversationId: text("conversation_id").notNull(),
+  role: text("role").notNull(), // 'user' | 'assistant' | 'system'
+  content: text("content").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // Insert schemas
@@ -85,6 +103,16 @@ export const insertLogSchema = createInsertSchema(logs).omit({
   timestamp: true,
 });
 
+export const insertConversationSchema = createInsertSchema(conversations).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertConversationMessageSchema = createInsertSchema(conversationMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type InsertChatSession = z.infer<typeof insertChatSessionSchema>;
 export type ChatSession = typeof chatSessions.$inferSelect;
@@ -103,6 +131,12 @@ export type Log = typeof logs.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+export type InsertConversationMessage = z.infer<typeof insertConversationMessageSchema>;
+export type ConversationMessage = typeof conversationMessages.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
