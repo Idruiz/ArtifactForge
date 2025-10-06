@@ -1,0 +1,65 @@
+SYSTEM // DO NOT DEVIATE — ADDITIVE CALENDAR ROUTE ONLY
+You are extending the project with a new, isolated feature: a multi-tenant Google Calendar booking service that runs SERVER-SIDE ONLY. This must be an additive module with its own folders, routes, UI entry, logs, and secrets. You are NOT allowed to edit, rename, or remove any existing artifact, website, presentation, audio, or data-analysis pipelines. No regressions. No cross-wiring. No CORS.
+
+## PURPOSE
+- Allow any signed-in user to authorize their Google Calendar (OAuth 2.0).
+- Read that user’s free/busy for a day, compute free windows, and create an event on their PRIMARY calendar.
+- Optionally, consult a coworker/boss calendar via ICS URL (read-only) or domain API (if visible) to avoid conflicts; invite by email.
+- Confirm back with event id, link, start/end.
+- All traffic is server-side (Express). No browser API calls to Google. No CORS config.
+
+## SCOPE
+- New backend route namespace: `/calendar-multi/*`
+- New module folder: `src/modules/calendarMulti/`
+- New UI entry in the LEFT sidebar under “Data Analysis”, titled **“Calendar Agent (Beta)”**, opening a small panel:
+  - 3 buttons: **Connect Google Calendar**, **Find Free Slot**, **Schedule**
+  - Form fields for: date (YYYY-MM-DD), preferredStart (HH:mm), duration (mins), attendee email (optional), ICS URL (optional)
+  - Panel must call the new backend endpoints ONLY; DO NOT reuse or couple to other pipelines.
+
+## DELIVERABLES
+1) **Router** mounted at `/calendar-multi` with these endpoints:
+   - `POST /auth/url` → returns Google consent URL for a given `userId`
+   - `GET  /oauth2/callback` → handles Google redirect, stores tokens per-user
+   - `POST /schedule` → creates an event on that user’s primary calendar (+ optional attendee invite)
+   - `POST /attendee/freebusy` (optional) → returns busy blocks for ICS or API
+2) **Token storage**: SQLite file `calendar_tokens.db`, tokens encrypted at rest (AES-256-GCM). Keys in Replit Secrets.
+3) **Validation**: use `zod` to validate inputs and return clean 4xx errors (no mystery 400s).
+4) **Time**: accept `tz` (default `America/Los_Angeles`), `workHours {start,end}`, `preferredStart`, `durationMins`. Respect day bounds.
+5) **Logging**: prefix all logs with `[CAL]`, no secrets in logs.
+
+## CONSTRAINTS
+- Server-only Google API calls (via `googleapis`). Absolutely NO client/browser calls to Google.
+- Do not import or touch existing artifact code or menus. This is a sealed unit.
+- UI panel is a minimal add-on: a left-sidebar item with a small view that calls `/calendar-multi/*`. Zero coupling to other pipelines.
+- Default calendarId is `"primary"`. We never require the user to find their own ID.
+- Coworker calendars: if API visibility fails, fall back to ICS or just send invite; do not error out needlessly.
+
+## ENV VARS (Replit Secrets)
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI` → `https://<your-deployed-domain>/calendar-multi/oauth2/callback`
+- `CAL_TOKENS_ENC_KEY` → 32-byte secret
+
+## DEPENDENCIES
+- `"express"`, `"googleapis"`, `"better-sqlite3"`, `"zod"`, TypeScript tooling.
+- Provide `package.json` and `tsconfig.json`. Build with `npm run build`, serve with `npm start`.
+
+## UI INSTRUCTIONS (LEFT SIDEBAR)
+- Add a new static entry **“Calendar Agent (Beta)”** UNDER the existing **Data Analysis** section (do not rename other items).
+- Clicking it opens a small panel with:
+  - If not authorized: a button “Connect Google Calendar” → hits `POST /calendar-multi/auth/url` with `{userId}` and then redirects user to returned `authUrl`.
+  - “Find Free Slot” calls `POST /calendar-multi/attendee/freebusy` (if ICS/API provided) and shows first 3 mutual windows; otherwise just show user free windows from `/calendar-multi/schedule` pre-check logic (you can implement a dry-run mode or reuse attendee endpoint).
+  - “Schedule” calls `POST /calendar-multi/schedule` with `{ userId, title, description, location, date, preferredStart, durationMins, tz, workHours, attendee:{mode,value,email} }`.
+- The panel is self-contained; it must NOT reuse any components from artifact pipelines.
+
+## ACCEPTANCE TESTS
+- Startup: server prints the four route paths with `[CAL]`.
+- Auth: `POST /calendar-multi/auth/url` returns a valid Google consent URL; callback saves tokens for `userId`.
+- Schedule: with only my calendar, finds a valid slot within work hours and returns `eventId` + `htmlLink`.
+- Attendee via ICS: respects busy intervals; schedules mutual free; adds invite if `email` is provided.
+- API attendee in a domain: if visibility is granted, uses FreeBusy; otherwise degrades gracefully.
+- UI: New left-sidebar entry appears BELOW “Data Analysis”; panel works end-to-end without touching other pipelines.
+- No CORS: all Google calls are server-side; no browser fetches to Google domains.
+
+## NEXT STEP
+I will paste the COMPLETE code package next. Create the folders/files exactly as referenced, wire the router at `/calendar-multi`, add the sidebar panel, install deps, and ensure build/start scripts work. Do not refactor or relocate existing code. Ship minimal, clean styling; function over form.

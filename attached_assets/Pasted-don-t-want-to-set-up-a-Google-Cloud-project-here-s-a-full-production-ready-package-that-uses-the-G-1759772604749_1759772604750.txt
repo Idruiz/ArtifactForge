@@ -1,0 +1,459 @@
+don’t want to set up a Google Cloud project, here’s a full, production-ready package that uses the Google Apps Script Web App proxy route. Each user authorizes their own Apps Script once (Google’s consent page pops up automatically), then your Replit agent talks server-to-server to that user’s GAS URL. No GCP OAuth app, no secrets juggling, no CORS hell.
+
+What this package does
+
+New, isolated module /calendar-proxy/* (doesn’t touch your other pipelines).
+
+Per-user registry: userId → GAS web app URL (+ shared token).
+
+Endpoints:
+
+POST /calendar-proxy/register → save user’s GAS URL + shared token
+
+POST /calendar-proxy/free → get free/mutual slots for that user
+
+POST /calendar-proxy/schedule → create event on that user’s calendar (+ optional invite)
+
+Optional coworker busy via ICS URL (read-only).
+
+SQLite storage, input validation, time sanity checks, and clean JSON errors.
+
+0) Apps Script (user-side, one time per user)
+
+Have each user deploy this (or you do it for yourself). It shows Google’s OAuth screen automatically on first run. Add a shared token check so only your Replit backend can call it.
+
+Create at https://script.new
+ → Deploy → Web app
+
+Execute as: Me
+
+Who has access: Anyone with the link
+
+Copy the deployed Web app URL and choose a SHARED_TOKEN (random string).
+
+/** Calendar Booking Web App (GAS proxy, no GCP project) */
+const TZ_DEFAULT = 'America/Los_Angeles';
+const SHARED_TOKEN = 'REPLACE_WITH_RANDOM_SECRET'; // set per user
+const CACHE_TTL_SECS = 600;
+
+function doGet(e){ return json(200,{ok:true,msg:'GAS Calendar alive'}); }
+
+function doPost(e){
+  try{
+    const body = parseJson(e.postData && e.postData.contents);
+    guardToken(body && body.sharedToken);
+    if(!body || !body.action) return json(400,{error:'Missing action'});
+    switch(body.action){
+      case 'getFreeSlots': return handleGetFreeSlots(body);
+      case 'schedule': return handleSchedule(body);
+      default: return json(400,{error:'Unknown action'});
+    }
+  }catch(err){ return json(500,{error:String(err && err.stack? err.stack: err)}); }
+}
+
+function guardToken(tok){
+  if(!tok || tok !== SHARED_TOKEN) throw new Error('Unauthorized');
+}
+
+function handleGetFreeSlots(p){
+  const tz = p.tz || TZ_DEFAULT;
+  const dateISO = assertDate(p.date);
+  const wh = normalizeWH(p.workHours);
+  const dur = Math.max(15, Number(p.durationMins||30));
+
+  const myBusy = getBusyDay_(dateISO, tz);
+  const myFree = invertBusy_(myBusy, dateISO, wh, tz);
+
+  let mutual = myFree;
+  if(p.coworkerICS){
+    const theirBusy = busyFromICS_(p.coworkerICS, dateISO, tz, wh);
+    const theirFree = invertBusy_(theirBusy, dateISO, wh, tz);
+    mutual = intersect_(myFree, theirFree);
+  }
+  const viable = mutual.filter(iv => mins_(iv.start,iv.end,tz) >= dur);
+  return json(200,{date:dateISO,tz,durationMins:dur,free:viable});
+}
+
+function handleSchedule(p){
+  const tz = p.tz || TZ_DEFAULT;
+  const dateISO = assertDate(p.date);
+  const wh = normalizeWH(p.workHours);
+  const dur = Math.max(15, Number(p.durationMins||30));
+  const preferred = p.preferredStart ? assertHHmm(p.preferredStart) : null;
+  const title = String(p.title||'').trim();
+  if(!title) return json(400,{error:'Missing title'});
+
+  const myBusy = getBusyDay_(dateISO, tz);
+  const myFree = invertBusy_(myBusy, dateISO, wh, tz);
+
+  let mutual = myFree;
+  if(p.coworkerICS){
+    const theirBusy = busyFromICS_(p.coworkerICS, dateISO, tz, wh);
+    const theirFree = invertBusy_(theirBusy, dateISO, wh, tz);
+    mutual = intersect_(myFree, theirFree);
+  }
+
+  const slot = pickSlot_(mutual, preferred, dur, tz);
+  if(!slot) return json(409,{error:'No mutual free slot',suggestions:suggest_(myFree,dur,tz)});
+
+  const cal = CalendarApp.getDefaultCalendar();
+  const ev = cal.createEvent(title, toDT_(slot.start,tz), toDT_(slot.end,tz), {
+    description: p.description||'',
+    location: p.location||''
+  });
+  if(p.attendeeEmail){ try{ ev.addGuest(p.attendeeEmail);}catch(_){ /*ignore*/ } }
+
+  return json(200,{
+    eventId: ev.getId(),
+    htmlLink: ev.getHtmlLink(),
+    title,
+    start: slot.start,
+    end: slot.end,
+    tz,
+    attendees: p.attendeeEmail? [{email:p.attendeeEmail}] : []
+  });
+}
+
+/* ---------- helpers (same as earlier, compact) ---------- */
+function assertDate(s){ if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw 'date YYYY-MM-DD'; return s; }
+function assertHHmm(s){ if(!/^\d{2}:\d{2}$/.test(s)) throw 'time HH:mm'; return s; }
+function normalizeWH(h){ const d={start:'09:00',end:'18:00'}; return {start:assertHHmm((h&&h.start)||d.start),end:assertHHmm((h&&h.end)||d.end)}; }
+function toDT_(iso,tz){ const [D,T]=iso.split('T'); const [Y,M,d]=D.split('-').map(Number); const [h,m]=T.split(':').map(Number); return new Date(Utilities.formatDate(new Date(Y,M-1,d,h,m),tz,"MMM d, yyyy HH:mm:ss z")); }
+function fromDate_(d,tz){ return Utilities.formatDate(d,tz,"yyyy-MM-dd'T'HH:mm"); }
+function mins_(s,e,tz){ return Math.max(0,(toDT_(e,tz)-toDT_(s,tz))/60000|0); }
+
+function getBusyDay_(date,tz){
+  const cal=CalendarApp.getDefaultCalendar();
+  const evs=cal.getEvents(toDT_(date+'T00:00',tz),toDT_(date+'T23:59',tz));
+  const arr=evs.map(ev=>({start:fromDate_(ev.getStartTime(),tz),end:fromDate_(ev.getEndTime(),tz)}));
+  return merge_(arr);
+}
+function invertBusy_(busy,date,wh,tz){
+  const bounds={start:date+'T'+wh.start,end:date+'T'+wh.end};
+  const out=[]; let cur=bounds.start; const B=merge_(busy);
+  for(const b of B){ if(b.start>cur) out.push({start:cur,end:b.start}); if(b.end>cur) cur=b.end; }
+  if(cur<bounds.end) out.push({start:cur,end:bounds.end}); return out;
+}
+function merge_(arr){ if(!arr||!arr.length) return []; const A=arr.slice().sort((a,b)=>a.start<b.start?-1:1); const out=[A[0]];
+  for(let i=1;i<A.length;i++){ const p=out[out.length-1], c=A[i]; if(c.start<=p.end){ if(c.end>p.end) p.end=c.end; } else out.push(c); }
+  return out;
+}
+function intersect_(a,b){ const out=[]; let i=0,j=0; while(i<a.length&&j<b.length){ const s=a[i].start>b[j].start?a[i].start:b[j].start; const e=a[i].end<b[j].end?a[i].end:b[j].end; if(s<e) out.push({start:s,end:e}); if(a[i].end<b[j].end)i++;else j++; } return out; }
+function pickSlot_(free, pref, dur, tz){
+  if(pref){ for(const iv of free){ const s=iv.start.slice(0,10)+'T'+pref; if(s>=iv.start && s<iv.end){ const e=addM_(s,dur,tz); if(e<=iv.end) return {start:s,end:e}; } } }
+  for(const iv of free){ if(mins_(iv.start,iv.end,tz)>=dur){ return {start:iv.start,end:addM_(iv.start,dur,tz)}; } } return null;
+}
+function addM_(iso,mins,tz){ const d=toDT_(iso,tz); return fromDate_(new Date(d.getTime()+mins*60000),tz); }
+function suggest_(free,dur,tz){ const s=[]; for(const iv of free){ if(mins_(iv.start,iv.end,tz)>=dur){ s.push({start:iv.start,end:addM_(iv.start,dur,tz)}); if(s.length>=3) break; } } return s; }
+
+function busyFromICS_(url,date,tz,wh){
+  try{
+    const r=UrlFetchApp.fetch(url,{muteHttpExceptions:true}); if(r.getResponseCode()!==200) return [];
+    const events=parseICS_(r.getContentText());
+    const day0=date+'T00:00', day1=date+'T23:59';
+    const out=[];
+    for(const ev of events){
+      const s=ev.start, e=ev.end; if(e<day0||s>day1) continue;
+      const S=max_(s,day0,date+'T'+wh.start), E=min_(e,day1,date+'T'+wh.end);
+      if(E>S) out.push({start:S,end:E});
+    }
+    return merge_(out);
+  }catch(_){ return []; }
+}
+
+function parseICS_(txt){
+  const lines=txt.split(/\r?\n/); const out=[]; let cur=null, L=[];
+  for(let i=0;i<lines.length;i++){ if(i>0 && (lines[i].startsWith(' ')||lines[i].startsWith('\t'))) L[L.length-1]+=lines[i].slice(1); else L.push(lines[i]); }
+  for(const ln of L){
+    if(ln==='BEGIN:VEVENT'){ cur={}; }
+    else if(ln==='END:VEVENT'){ if(cur && cur.DTSTART && cur.DTEND) out.push({start:icsToLocal_(cur.DTSTART),end:icsToLocal_(cur.DTEND)}); cur=null; }
+    else if(cur){ const k=ln.indexOf(':'); if(k>-1){ const key=ln.slice(0,k).split(';')[0]; const val=ln.slice(k+1); cur[key]=val; } }
+  }
+  return out;
+}
+function icsToLocal_(v){
+  if(v.endsWith('Z')){ const Y=v.slice(0,4),M=v.slice(4,6),D=v.slice(6,8),h=v.slice(9,11),m=v.slice(11,13);
+    const utc=new Date(Date.UTC(Y,Number(M)-1,D,h,m)); return Utilities.formatDate(utc,Session.getScriptTimeZone(),"yyyy-MM-dd'T'HH:mm"); }
+  const Y=v.slice(0,4),M=v.slice(4,6),D=v.slice(6,8),h=v.slice(9,11)||'0',m=v.slice(11,13)||'0';
+  return Utilities.formatDate(new Date(Number(Y),Number(M)-1,Number(D),Number(h),Number(m)),Session.getScriptTimeZone(),"yyyy-MM-dd'T'HH:mm");
+}
+function max_(...xs){ return xs.sort()[xs.length-1]; }
+function min_(...xs){ return xs.sort()[0]; }
+
+function parseJson(s){ try{return s?JSON.parse(s):null;}catch(_){return null;} }
+function json(status,obj){ const out=ContentService.createTextOutput(JSON.stringify(obj)); out.setMimeType(ContentService.MimeType.JSON); return out; }
+
+
+User gives you:
+
+webAppUrl (their GAS Web App URL)
+
+sharedToken (the secret you put in the script)
+
+1) package.json
+{
+  "name": "calendar-proxy-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --transpile-only --respawn src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.6.0",
+    "express": "^4.19.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.12",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.3"
+  }
+}
+
+2) tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"]
+}
+
+3) src/index.ts (server bootstrap)
+import express from "express";
+import calendarProxy from "./modules/calendarProxy/index.js";
+
+const app = express();
+app.use(express.json({ limit: "1mb" }));
+
+app.get("/health", (_req, res) => res.json({ ok: true, service: "calendar-proxy" }));
+
+// Isolated, additive
+app.use("/calendar-proxy", calendarProxy);
+
+const PORT = Number(process.env.PORT || 3000);
+app.listen(PORT, () => {
+  console.log(`[CAL-PROXY] listening on :${PORT}`);
+  console.log(`[CAL-PROXY] POST /calendar-proxy/register`);
+  console.log(`[CAL-PROXY] POST /calendar-proxy/free`);
+  console.log(`[CAL-PROXY] POST /calendar-proxy/schedule`);
+});
+
+4) src/modules/calendarProxy/index.ts (router)
+import express from "express";
+import Database from "better-sqlite3";
+import { z } from "zod";
+
+const router = express.Router();
+
+// --- DB (userId -> { webAppUrl, sharedToken }) ---
+const db = new Database("calendar_proxy.db");
+db.exec(`
+CREATE TABLE IF NOT EXISTS connectors (
+  user_id TEXT PRIMARY KEY,
+  web_app_url TEXT NOT NULL,
+  shared_token TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+`);
+
+function upsertConnector(userId: string, webAppUrl: string, sharedToken: string) {
+  const now = Date.now();
+  const up = db.prepare("UPDATE connectors SET web_app_url=?, shared_token=?, updated_at=? WHERE user_id=?")
+               .run(webAppUrl, sharedToken, now, userId);
+  if (up.changes === 0) {
+    db.prepare("INSERT INTO connectors(user_id, web_app_url, shared_token, created_at, updated_at) VALUES(?,?,?,?,?)")
+      .run(userId, webAppUrl, sharedToken, now, now);
+  }
+}
+
+function getConnector(userId: string) {
+  return db.prepare("SELECT web_app_url as webAppUrl, shared_token as sharedToken FROM connectors WHERE user_id=?").get(userId);
+}
+
+// --- Validation ---
+const RegisterSchema = z.object({
+  userId: z.string().min(1),
+  webAppUrl: z.string().url(),
+  sharedToken: z.string().min(8)
+});
+
+const FreeSchema = z.object({
+  userId: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  durationMins: z.number().int().positive().default(30),
+  tz: z.string().default("America/Los_Angeles"),
+  workHours: z.object({ start: z.string().regex(/^\d{2}:\d{2}$/), end: z.string().regex(/^\d{2}:\d{2}$/) }).optional(),
+  coworkerICS: z.string().url().optional()
+});
+
+const ScheduleSchema = z.object({
+  userId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().default(""),
+  location: z.string().default(""),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  preferredStart: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  durationMins: z.number().int().positive().default(30),
+  tz: z.string().default("America/Los_Angeles"),
+  workHours: z.object({ start: z.string().regex(/^\d{2}:\d{2}$/), end: z.string().regex(/^\d{2}:\d{2}$/) }).optional(),
+  attendeeEmail: z.string().email().optional(),
+  coworkerICS: z.string().url().optional()
+});
+
+// --- Helpers ---
+async function callGAS(webAppUrl: string, payload: any) {
+  const r = await fetch(webAppUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const text = await r.text();
+  let data: any = null;
+  try { data = JSON.parse(text); } catch { /* leave as null */ }
+  if (!r.ok) {
+    throw new Error(`GAS ${r.status}: ${data?.error || text}`);
+  }
+  if (data?.error) throw new Error(String(data.error));
+  return data;
+}
+
+// --- Routes ---
+
+// 1) Register a user's GAS connector
+router.post("/register", async (req, res) => {
+  const parsed = RegisterSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+
+  const { userId, webAppUrl, sharedToken } = parsed.data;
+  try {
+    // sanity ping
+    const ping = await callGAS(webAppUrl, { action: "getFreeSlots", date: "2100-01-01", tz: "America/Los_Angeles", durationMins: 30, sharedToken });
+    upsertConnector(userId, webAppUrl, sharedToken);
+    res.json({ ok: true, ping });
+  } catch (e: any) {
+    res.status(400).json({ error: "Failed to verify GAS endpoint", detail: e.message });
+  }
+});
+
+// 2) Get free/mutual slots
+router.post("/free", async (req, res) => {
+  const parsed = FreeSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+
+  const { userId, ...rest } = parsed.data;
+  const row = getConnector(userId);
+  if (!row) return res.status(404).json({ error: "User not registered. Call /calendar-proxy/register first." });
+
+  try {
+    const data = await callGAS(row.webAppUrl, { action: "getFreeSlots", sharedToken: row.sharedToken, ...rest });
+    res.json(data);
+  } catch (e: any) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// 3) Schedule on user’s calendar
+router.post("/schedule", async (req, res) => {
+  const parsed = ScheduleSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+
+  const { userId, ...rest } = parsed.data;
+  const row = getConnector(userId);
+  if (!row) return res.status(404).json({ error: "User not registered. Call /calendar-proxy/register first." });
+
+  try {
+    const data = await callGAS(row.webAppUrl, { action: "schedule", sharedToken: row.sharedToken, ...rest });
+    res.json(data);
+  } catch (e: any) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+export default router;
+
+5) How users connect (one-time, no GCP)
+
+They deploy the GAS web app (code above), set a SHARED_TOKEN, copy Web App URL.
+
+Your UI calls:
+
+POST /calendar-proxy/register
+Content-Type: application/json
+
+{
+  "userId": "USER-123",
+  "webAppUrl": "https://script.google.com/macros/s/AKfycbx.../exec",
+  "sharedToken": "their-random-secret"
+}
+
+
+→ returns { ok: true } if verified.
+
+Find free:
+
+POST /calendar-proxy/free
+{
+  "userId":"USER-123",
+  "date":"2025-10-09",
+  "durationMins":45,
+  "tz":"America/Vancouver",
+  "workHours":{"start":"09:00","end":"18:00"},
+  "coworkerICS":"https://calendar.google.com/calendar/ical/.../basic.ics"
+}
+
+
+Schedule:
+
+POST /calendar-proxy/schedule
+{
+  "userId":"USER-123",
+  "title":"Design Review",
+  "description":"v2 audit",
+  "location":"Zoom",
+  "date":"2025-10-09",
+  "preferredStart":"14:30",
+  "durationMins":45,
+  "tz":"America/Vancouver",
+  "workHours":{"start":"09:00","end":"18:00"},
+  "attendeeEmail":"boss@example.com",
+  "coworkerICS":"https://calendar.google.com/calendar/ical/.../basic.ics"
+}
+
+6) Sidebar UI instruction (additive, separate)
+
+Add a left-sidebar item “Calendar Agent (Proxy)” under “Data Analysis”.
+
+The panel should:
+
+Let a user paste Web App URL + Shared Token → POST /calendar-proxy/register.
+
+Inputs for date / preferredStart / duration / ICS URL / attendeeEmail, and buttons:
+
+Find Free Slot → /calendar-proxy/free
+
+Schedule → /calendar-proxy/schedule
+
+Do not share components or state with your artifact pipelines. Keep it sealed.
+
+7) Why this fits your constraints
+
+No Google Cloud project needed. Users authorize through GAS.
+
+No CORS: your server calls GAS; the browser only talks to your server.
+
+Multi-user: each user brings their own GAS URL + token; you store it per userId.
+
+Additive: lives at /calendar-proxy/*, never touches your other routes.
