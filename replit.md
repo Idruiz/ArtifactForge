@@ -60,6 +60,45 @@ Preferred communication style: Simple, everyday language.
 ### Database
 - **Neon Database**: Serverless PostgreSQL hosting, utilizing `@neondatabase/serverless` driver and Drizzle Kit for schema management.
 
+## Recent Updates (October 6, 2025)
+
+### CALENDAR AGENT INTEGRATION (Latest)
+**Feature**: Added isolated Calendar Agent module for Google Calendar scheduling via Apps Script proxy
+**Implementation**: Server-side only integration, no client-side Google API calls
+
+**Architecture**:
+- **Module Structure**: `server/modules/calendarProxy/` (isolated, additive)
+  - `db.ts` - SQLite storage for user connectors (user_id → GAS credentials)
+  - `schemas.ts` - Zod validation schemas for all inputs
+  - `gasClient.ts` - Google Apps Script proxy communication
+  - `router.ts` - Express router with register/free/schedule endpoints
+- **Database**: SQLite at `data/calendar_proxy.db`
+- **Routes**:
+  - `POST /calendar-proxy/register` - Register user's GAS web app URL + shared token
+  - `POST /calendar-proxy/free` - Get available time slots
+  - `POST /calendar-proxy/schedule` - Create calendar event
+  - `GET /api/calendar/config` - Fetch GAS credentials from env vars
+
+**UI Integration**:
+- **Left Sidebar**: "Calendar Agent (Beta)" button added below "Analyze" in Quick Actions
+  - Blue theme with Calendar icon and Beta badge
+  - Opens dialog panel on click
+- **CalendarPanel Component**: (`client/src/components/CalendarPanel.tsx`)
+  - Connection flow: Fetch config → Register GAS credentials → Enable scheduling
+  - Form fields: title, date, time, duration, attendee email, coworker ICS URL
+  - Actions: Find Free Slots, Schedule Event
+  - Results display: Free slots cards, event creation confirmation
+
+**Environment Variables**:
+- `GAS_WEB_APP_URL` - Google Apps Script deployed web app URL
+- `GAS_SHARED_TOKEN` - Shared secret for GAS authentication
+
+**Security**:
+- All Google Calendar operations happen server-side via GAS proxy
+- No browser-based Google API calls (no CORS issues)
+- Credentials stored in Replit Secrets
+- Per-user connector registration with isolated data
+
 ## Recent Updates (October 3, 2025)
 
 ### ORCHESTRATOR-DRIVEN PROMPTS: No Hardcoding (Latest)
