@@ -31,7 +31,8 @@ Preferred communication style: Simple, everyday language.
 - **Backend**: esbuild for production, tsx for development.
 
 ### Key Features and Design Decisions
-- **Three-Panel Layout**: Quick Actions, Chat, and Logs/Artifacts with panel size persistence.
+- **Three-Panel Layout**: Conversation History, Chat, and Logs/Artifacts with panel size persistence.
+- **Conversation Management**: Store last 10 conversations with isolated context per conversation (like ChatGPT). Each conversation maintains its own message history and context memory. Users can revisit, continue, export to CSV, or delete conversations.
 - **Dual-Delivery Artifacts**: Inline chat display and dedicated Artifacts panel with real-time updates.
 - **Smart Auto-Scroll**: Chat auto-scroll with "Jump to latest" button.
 - **Car Mode FSM**: State machine (IDLE → LISTENING → TRANSCRIBING → SENDING → THINKING → SPEAKING → IDLE) for hands-free voice interaction.
@@ -44,6 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **Orchestrator-Driven Prompts**: Adaptive, schema-driven prompt generation from runtime data, eliminating hardcoded examples.
 - **Pipeline Separation**: Intent router distinguishes between `DATA_ANALYSIS` and `RESEARCH_REPORT` pipelines, routing to specialized execution paths.
 - **R0-R5 Iterative Source Harvest System**: Improved source gathering strategy focusing on quality sources and iterative searching until at least 10 vetted sources are found, with a robust vetting policy.
+- **Context Isolation**: Each conversation has its own 20-turn rolling context window. Switching conversations clears context, ensuring no information leakage between conversations.
 
 ## External Dependencies
 

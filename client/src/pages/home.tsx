@@ -101,7 +101,7 @@ export default function Home() {
     if (!currentConversationId) {
       handleNewConversation();
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- UI state ----------
   const [persona, setPersona] = useState<Persona>("professional");

@@ -156,6 +156,7 @@ export function AgentWorkspace(p: Props) {
   };
 
   const [panelSizes] = useState(getPanelSizes());
+  const [leftPanelTab, setLeftPanelTab] = useState<"conversations" | "actions">("conversations");
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -207,18 +208,93 @@ export function AgentWorkspace(p: Props) {
           }
         }}
       >
-        {/* LEFT PANEL - Conversation History */}
+        {/* LEFT PANEL - Conversation History & Quick Actions */}
         <ResizablePanel
           defaultSize={panelSizes.left}
           minSize={10}
           maxSize={25}
           className="bg-slate-50"
         >
-          <ConversationSidebar
-            currentConversationId={p.currentConversationId}
-            onSelectConversation={p.onSelectConversation}
-            onNewConversation={p.onNewConversation}
-          />
+          <div className="h-full flex flex-col">
+            <div className="flex border-b border-slate-200 bg-white">
+              <button
+                onClick={() => setLeftPanelTab("conversations")}
+                className={`flex-1 px-3 py-2 text-sm font-medium ${
+                  leftPanelTab === "conversations"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                data-testid="tab-conversations"
+              >
+                Conversations
+              </button>
+              <button
+                onClick={() => setLeftPanelTab("actions")}
+                className={`flex-1 px-3 py-2 text-sm font-medium ${
+                  leftPanelTab === "actions"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                data-testid="tab-quick-actions"
+              >
+                Quick Actions
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-hidden">
+              {leftPanelTab === "conversations" && (
+                <ConversationSidebar
+                  currentConversationId={p.currentConversationId}
+                  onSelectConversation={p.onSelectConversation}
+                  onNewConversation={p.onNewConversation}
+                />
+              )}
+              
+              {leftPanelTab === "actions" && (
+                <div className="h-full p-3 overflow-y-auto">
+                  <h3 className="text-sm font-semibold text-slate-900 mb-3">
+                    Quick Actions
+                  </h3>
+                  <div className="space-y-2">
+                    {([
+                      ["presentation", BarChart3, "Presentation"],
+                      ["report", FileText, "Report"],
+                      ["website", Globe, "Website"],
+                      ["analyze", TrendingUp, "Analyze"],
+                    ] as const).map(([key, Icon, label]) => (
+                      <Button
+                        key={key}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => p.onQuickAction(key as string)}
+                        className="w-full justify-start"
+                        data-testid={`button-quick-${key}`}
+                      >
+                        <Icon className="w-4 h-4 mr-2" />
+                        {label}
+                      </Button>
+                    ))}
+                    
+                    <div className="pt-2 mt-2 border-t border-gray-200">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => p.onQuickAction("calendar")}
+                        className="w-full justify-start text-blue-600 border-blue-200 hover:bg-blue-50"
+                        data-testid="button-quick-calendar"
+                      >
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Calendar Agent
+                        <Badge variant="secondary" className="ml-auto text-[10px] px-1.5">
+                          Beta
+                        </Badge>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </ResizablePanel>
 
         <ResizableHandle withHandle />
