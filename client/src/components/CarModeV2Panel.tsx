@@ -16,7 +16,7 @@ export default function CarModeV2Panel({ userId, tz = "America/Los_Angeles" }: P
   const recRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const vadActiveRef = useRef(false);
-  const vadSilenceMs = 800; // stop after 800ms of silence
+  const vadSilenceMs = 1500; // stop after 1.5s of silence (was 800ms - too short)
   const vadTimerRef = useRef<number | null>(null);
   const meterRef = useRef<ScriptProcessorNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -118,9 +118,16 @@ export default function CarModeV2Panel({ userId, tz = "America/Los_Angeles" }: P
   async function flushChunk() {
     const blob = new Blob(chunksRef.current, { type: "audio/webm" });
     chunksRef.current = [];
-    if (blob.size < 2000) { return; } // too tiny
+    
+    if (blob.size < 500) { 
+      logLine(`⚠️ chunk too small: ${blob.size} bytes (need 500+)`);
+      return;
+    }
+    
     if (!listening) return;
 
+    logLine(`📤 sending ${blob.size} bytes to STT...`);
+    
     // POST to STT
     const fd = new FormData();
     fd.append("audio", blob, "chunk.webm");
