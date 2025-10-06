@@ -275,7 +275,7 @@ export function AgentWorkspace(p: Props) {
                       </Button>
                     ))}
                     
-                    <div className="pt-2 mt-2 border-t border-gray-200">
+                    <div className="pt-2 mt-2 border-t border-gray-200 space-y-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -287,6 +287,20 @@ export function AgentWorkspace(p: Props) {
                         Calendar Agent
                         <Badge variant="secondary" className="ml-auto text-[10px] px-1.5">
                           Beta
+                        </Badge>
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => p.onQuickAction("carv2")}
+                        className="w-full justify-start text-green-600 border-green-200 hover:bg-green-50"
+                        data-testid="button-quick-carv2"
+                      >
+                        <TrendingUp className="w-4 h-4 mr-2" />
+                        Car Mode V2
+                        <Badge variant="secondary" className="ml-auto text-[10px] px-1.5">
+                          New
                         </Badge>
                       </Button>
                     </div>

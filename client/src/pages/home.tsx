@@ -3,6 +3,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { AgentWorkspace } from "@/components/AgentWorkspace";
 import { ApiKeysModal } from "@/components/ApiKeysModal";
 import { CalendarPanel } from "@/components/CalendarPanel";
+import CarModeV2Panel from "@/components/CarModeV2Panel";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useVoice } from "@/hooks/useVoice";
@@ -338,10 +339,16 @@ export default function Home() {
   };
 
   const [showCalendarPanel, setShowCalendarPanel] = useState(false);
+  const [showCarModeV2Panel, setShowCarModeV2Panel] = useState(false);
 
   const handleQuickAction = (action: string) => {
     if (action === "calendar") {
       setShowCalendarPanel(true);
+      return;
+    }
+    
+    if (action === "carv2") {
+      setShowCarModeV2Panel(true);
       return;
     }
 
@@ -474,6 +481,15 @@ export default function Home() {
             <DialogTitle>Calendar Agent (Beta)</DialogTitle>
           </DialogHeader>
           <CalendarPanel userId={sessionId} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCarModeV2Panel} onOpenChange={setShowCarModeV2Panel}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Car Mode V2 (Beta)</DialogTitle>
+          </DialogHeader>
+          <CarModeV2Panel userId={sessionId} />
         </DialogContent>
       </Dialog>
     </div>
