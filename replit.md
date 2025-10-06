@@ -35,7 +35,7 @@ Preferred communication style: Simple, everyday language.
 - **Conversation Management**: Store last 10 conversations with isolated context per conversation (like ChatGPT). Each conversation maintains its own message history and context memory. Users can revisit, continue, export to CSV, or delete conversations.
 - **Dual-Delivery Artifacts**: Inline chat display and dedicated Artifacts panel with real-time updates.
 - **Smart Auto-Scroll**: Chat auto-scroll with "Jump to latest" button.
-- **Car Mode V2**: Hands-free voice interaction with Voice Activity Detection (VAD), circuit breaker, rate limiting, and budget controls. Uses OpenAI Whisper for speech-to-text with automatic calendar command routing.
+- **Car Mode**: Hands-free voice interaction integrated into the top ribbon toggle. Uses MediaRecorder with Voice Activity Detection (VAD) for reliable audio capture. Features 3-second sustained silence detection, OpenAI Whisper STT endpoint, automatic transcription-to-chat integration, and text-to-speech for AI responses. Zero-gain audio graph prevents feedback while maintaining VAD functionality.
 - **Multi-step Content Generation**: Pipelines for Research, Outline, Visual Matching, Building, and Delivery.
 - **Robust DOCX Generation**: 6-stage validation pipeline including citation mapping, table generation, and chart embedding.
 - **Data Analysis Enforcement**: Prompt engineering to ensure deep analysis and synthesis, prohibiting meta-language.
