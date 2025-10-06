@@ -3,6 +3,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { AgentWorkspace } from "@/components/AgentWorkspace";
 import { ApiKeysModal } from "@/components/ApiKeysModal";
 import { CalendarPanel } from "@/components/CalendarPanel";
+import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useVoice } from "@/hooks/useVoice";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +17,8 @@ import {
 } from "@/lib/types";
 import { nanoid } from "nanoid";
 import { callOrchestrator, isActionIntent } from "@/lib/orchestrator";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 // ---------- persist keys between reloads ----------
 const storedKeys = JSON.parse(
@@ -31,6 +34,74 @@ export default function Home() {
     localStorage.setItem('agentdiaz-session-id', newId);
     return newId;
   });
+
+  // ---------- conversation management ----------
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(() => {
+    return localStorage.getItem('agentdiaz-current-conversation') || null;
+  });
+
+  // Save conversation messages to database
+  const saveMessageMutation = useMutation({
+    mutationFn: async ({ conversationId, role, content }: { conversationId: string, role: string, content: string }) => {
+      const res = await apiRequest("POST", `/api/conversations/${conversationId}/messages`, { role, content });
+      return res.json();
+    },
+  });
+
+  // Create new conversation
+  const createConversationMutation = useMutation({
+    mutationFn: async ({ id, title }: { id: string, title: string }) => {
+      const res = await apiRequest("POST", "/api/conversations", { id, userId: sessionId, title });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      setCurrentConversationId(data.id);
+      localStorage.setItem('agentdiaz-current-conversation', data.id);
+    },
+  });
+
+  const handleNewConversation = () => {
+    const newId = nanoid();
+    const title = `Conversation ${new Date().toLocaleString()}`;
+    createConversationMutation.mutate({ id: newId, title });
+    setUserMessages([]); // Clear local messages for new conversation
+  };
+
+  const handleSelectConversation = async (conversationId: string) => {
+    setCurrentConversationId(conversationId);
+    localStorage.setItem('agentdiaz-current-conversation', conversationId);
+    
+    // Load messages from conversation
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const loadedMessages = data.messages.map((msg: any) => ({
+          id: msg.id.toString(),
+          role: msg.role,
+          content: msg.content,
+          timestamp: new Date(msg.createdAt),
+          status: "completed",
+        }));
+        setUserMessages(loadedMessages);
+      }
+    } catch (error) {
+      console.error("Failed to load conversation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load conversation messages",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Auto-create first conversation if none exists
+  useEffect(() => {
+    if (!currentConversationId) {
+      handleNewConversation();
+    }
+  }, []);
 
   // ---------- UI state ----------
   const [persona, setPersona] = useState<Persona>("professional");
@@ -79,7 +150,7 @@ export default function Home() {
     },
     async (text) => {
       // Car Mode auto-send callback (triggered after 3 seconds of silence)
-      if (!text.trim()) return;
+      if (!text.trim() || !currentConversationId) return;
 
       const userId = sessionId;
 
@@ -95,10 +166,20 @@ export default function Home() {
         },
       ]);
 
+      // Save user message to database
+      if (currentConversationId) {
+        saveMessageMutation.mutate({
+          conversationId: currentConversationId,
+          role: "user",
+          content: text,
+        });
+      }
+
       // Call orchestrator first
       const orchResult = await callOrchestrator({
         userId,
         text,
+        conversationId: currentConversationId,
         voice: true,
         sessionId,
         apiKeys,
@@ -119,6 +200,15 @@ export default function Home() {
             status: "completed",
           },
         ]);
+
+        // Save assistant response to database
+        if (currentConversationId) {
+          saveMessageMutation.mutate({
+            conversationId: currentConversationId,
+            role: "assistant",
+            content: responseContent,
+          });
+        }
 
         // Always speak in car mode
         speak(responseContent);
@@ -163,7 +253,7 @@ export default function Home() {
 
   // ---------- handlers ----------
   const handleSendMessage = async () => {
-    if (!chatInput.trim()) return;
+    if (!chatInput.trim() || !currentConversationId) return;
 
     const userMessage = chatInput;
     const userId = sessionId; // Use sessionId as userId for orchestrator
@@ -182,10 +272,20 @@ export default function Home() {
 
     setChatInput("");
 
+    // Save user message to database
+    if (currentConversationId) {
+      saveMessageMutation.mutate({
+        conversationId: currentConversationId,
+        role: "user",
+        content: userMessage,
+      });
+    }
+
     // Call orchestrator first
     const orchResult = await callOrchestrator({
       userId,
       text: userMessage,
+      conversationId: currentConversationId,
       voice: false,
       sessionId,
       apiKeys,
@@ -206,6 +306,15 @@ export default function Home() {
           status: "completed",
         },
       ]);
+
+      // Save assistant response to database
+      if (currentConversationId) {
+        saveMessageMutation.mutate({
+          conversationId: currentConversationId,
+          role: "assistant",
+          content: responseContent,
+        });
+      }
 
       if (orchResult.followup && voiceEnabled) {
         speak(orchResult.followup);
@@ -347,6 +456,9 @@ export default function Home() {
         onQuickAction={handleQuickAction}
         onDownloadArtifact={handleDownloadArtifact}
         onPreviewArtifact={handlePreviewArtifact}
+        currentConversationId={currentConversationId}
+        onSelectConversation={handleSelectConversation}
+        onNewConversation={handleNewConversation}
       />
 
       <ApiKeysModal

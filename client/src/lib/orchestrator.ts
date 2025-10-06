@@ -4,6 +4,7 @@
 interface OrchestratorRequest {
   userId: string;
   text: string;
+  conversationId?: string;
   voice?: boolean;
   sessionId: string;
   apiKeys: {

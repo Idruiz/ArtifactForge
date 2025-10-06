@@ -33,6 +33,7 @@ import type {
   ArtifactRef,
 } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
+import { ConversationSidebar } from "./ConversationSidebar";
 
 interface Props {
   agentStatus: AgentStatus;
@@ -42,6 +43,9 @@ interface Props {
   onQuickAction: (action: string) => void;
   onDownloadArtifact: (a: Artifact) => void;
   onPreviewArtifact: (a: Artifact) => void;
+  currentConversationId: string | null;
+  onSelectConversation: (conversationId: string) => void;
+  onNewConversation: () => void;
 }
 
 export function AgentWorkspace(p: Props) {
@@ -203,54 +207,18 @@ export function AgentWorkspace(p: Props) {
           }
         }}
       >
-        {/* LEFT PANEL - Quick Actions */}
+        {/* LEFT PANEL - Conversation History */}
         <ResizablePanel
           defaultSize={panelSizes.left}
           minSize={10}
           maxSize={25}
           className="bg-slate-50"
         >
-          <div className="h-full p-3 overflow-y-auto">
-            <h3 className="text-sm font-semibold text-slate-900 mb-3">
-              Quick Actions
-            </h3>
-            <div className="space-y-2">
-              {([
-                ["presentation", BarChart3, "Presentation"],
-                ["report", FileText, "Report"],
-                ["website", Globe, "Website"],
-                ["analyze", TrendingUp, "Analyze"],
-              ] as const).map(([key, Icon, label]) => (
-                <Button
-                  key={key}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => p.onQuickAction(key as string)}
-                  className="w-full justify-start"
-                  data-testid={`button-quick-${key}`}
-                >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {label}
-                </Button>
-              ))}
-              
-              <div className="pt-2 mt-2 border-t border-gray-200">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => p.onQuickAction("calendar")}
-                  className="w-full justify-start text-blue-600 border-blue-200 hover:bg-blue-50"
-                  data-testid="button-quick-calendar"
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Calendar Agent
-                  <Badge variant="secondary" className="ml-auto text-[10px] px-1.5">
-                    Beta
-                  </Badge>
-                </Button>
-              </div>
-            </div>
-          </div>
+          <ConversationSidebar
+            currentConversationId={p.currentConversationId}
+            onSelectConversation={p.onSelectConversation}
+            onNewConversation={p.onNewConversation}
+          />
         </ResizablePanel>
 
         <ResizableHandle withHandle />
