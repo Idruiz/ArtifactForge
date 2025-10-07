@@ -1,5 +1,5 @@
 import express from "express";
-import { openDb } from "../../lib/db.js";
+import { openDb } from "../../lib/db";
 
 const router = express.Router();
 const db = openDb("calendar_credentials.db");

@@ -1,4 +1,4 @@
-import { openDb } from "../../lib/db.js";
+import { openDb } from "../../lib/db";
 
 const db = openDb("calendar_proxy.db");
 
