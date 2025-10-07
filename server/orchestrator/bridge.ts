@@ -188,6 +188,7 @@ export async function toCalendar(params: {
     
     // Parse the command
     const parsed = parseCommand(params.command);
+    console.log('[ORCH-CAL] Parsed command:', JSON.stringify(parsed));
     
     // Call the service directly
     const result = await scheduleViaProxy(userId, {
@@ -199,6 +200,8 @@ export async function toCalendar(params: {
       workHours,
       attendeeAlias: parsed.alias,
     });
+    
+    console.log('[ORCH-CAL] Result from scheduleViaProxy:', JSON.stringify(result));
 
     // Check for successful booking
     if (result.eventId && result.htmlLink) {
@@ -218,9 +221,10 @@ export async function toCalendar(params: {
       ok: false,
       intent: 'CALENDAR',
       actionTaken: 'Calendar command processed but no clear action taken',
-      followup: 'Please try rephrasing your calendar request.',
+      followup: `Please try rephrasing your calendar request. Debug: ${JSON.stringify(result)}`,
     };
   } catch (err: any) {
+    console.error('[ORCH-CAL] Error:', err);
     const errorMsg = err.message || 'Unknown error';
     return {
       ok: false,
