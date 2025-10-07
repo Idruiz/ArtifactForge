@@ -107,29 +107,6 @@ app.use("/sites", sitesRouter);
     }
   });
 
-  // ---------- OpenAI Text-to-Speech proxy ----------
-  app.post("/api/tts", async (req: Request, res: Response) => {
-    try {
-      const { text, voice = "alloy" } = req.body || {};
-      if (!text) return res.status(400).json({ error: "`text` field is required" });
-
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey) return res.status(500).json({ error: "OPENAI_API_KEY not set" });
-
-      const r = await axios.post(
-        "https://api.openai.com/v1/audio/speech",
-        { model: "tts-1", input: text, voice },
-        { responseType: "arraybuffer", headers: { Authorization: `Bearer ${apiKey}` } },
-      );
-
-      res.setHeader("Content-Type", "audio/mpeg");
-      res.send(r.data);
-    } catch (e: any) {
-      console.error("[tts]", e?.response?.data || e?.message || e);
-      res.status(500).json({ error: "TTS failed" });
-    }
-  });
-
   // Simple health check
   app.get("/healthz", (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
