@@ -178,38 +178,39 @@ export async function toCalendar(params: {
   userId?: string;
 }): Promise<BridgeResult> {
   try {
-    // Use the working calendar-book/command endpoint
-    const response = await axios.post('http://localhost:5000/calendar-book/command', {
-      userId: params.userId || 'idruiz12@gmail.com',
-      text: params.command,
-      tz: 'America/Vancouver',
-      workHours: { start: '09:00', end: '18:00' },
+    // Import the calendar booking service directly instead of making HTTP call
+    const { scheduleViaProxy } = await import('../modules/calendarBook/service.js');
+    const { parseCommand } = await import('../modules/calendarBook/nlp.js');
+    
+    const userId = params.userId || 'idruiz12@gmail.com';
+    const tz = 'America/Vancouver';
+    const workHours = { start: '09:00', end: '18:00' };
+    
+    // Parse the command
+    const parsed = parseCommand(params.command);
+    
+    // Call the service directly
+    const result = await scheduleViaProxy(userId, {
+      title: parsed.intent === 'schedule' ? parsed.title : 'Meeting',
+      date: parsed.date,
+      preferredStart: (parsed.intent === 'schedule' ? parsed.hhmm : null) || null,
+      durationMins: parsed.dur,
+      tz,
+      workHours,
+      attendeeAlias: parsed.alias,
     });
 
-    const data = response.data;
-
     // Check for successful booking
-    if (data.eventId && data.htmlLink) {
+    if (result.eventId && result.htmlLink) {
       return {
         ok: true,
         intent: 'CALENDAR',
         actionTaken: `Created calendar event successfully`,
         event: {
-          id: data.eventId,
-          htmlLink: data.htmlLink,
+          id: result.eventId,
+          htmlLink: result.htmlLink,
         },
-        followup: `Event created! View it here: ${data.htmlLink}`,
-      };
-    }
-
-    // Handle free slots response
-    if (data.freeSlots && Array.isArray(data.freeSlots)) {
-      const slots = data.freeSlots.slice(0, 3).map((s: any) => s.start).join(', ');
-      return {
-        ok: true,
-        intent: 'CALENDAR',
-        actionTaken: `Found ${data.freeSlots.length} free slots`,
-        followup: `Available times: ${slots}. Say "book the first one" to schedule.`,
+        followup: `Event created! View it here: ${result.htmlLink}`,
       };
     }
 
@@ -217,10 +218,10 @@ export async function toCalendar(params: {
       ok: false,
       intent: 'CALENDAR',
       actionTaken: 'Calendar command processed but no clear action taken',
-      followup: data.message || 'Please try rephrasing your calendar request.',
+      followup: 'Please try rephrasing your calendar request.',
     };
   } catch (err: any) {
-    const errorMsg = err.response?.data?.error || err.message || 'Unknown error';
+    const errorMsg = err.message || 'Unknown error';
     return {
       ok: false,
       intent: 'CALENDAR',
