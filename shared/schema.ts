@@ -76,6 +76,20 @@ export const conversationMessages = pgTable("conversation_messages", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const calendarConnectors = pgTable("calendar_connectors", {
+  userId: text("user_id").primaryKey(),
+  webAppUrl: text("web_app_url").notNull(),
+  sharedToken: text("shared_token").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const calendarColleagues = pgTable("calendar_colleagues", {
+  alias: text("alias").primaryKey(),
+  email: text("email"),
+  icsUrl: text("ics_url"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Insert schemas
 export const insertChatSessionSchema = createInsertSchema(chatSessions).omit({
   id: true,

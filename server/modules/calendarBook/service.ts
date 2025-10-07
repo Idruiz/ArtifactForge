@@ -1,12 +1,17 @@
-import { openDb } from "../../lib/db";
+import { storage } from "../../storage";
 
-const db = openDb("calendar_credentials.db");
-
-function getConnector(userId: string): { webAppUrl: string; sharedToken: string } | undefined {
-  return db.prepare(`SELECT web_app_url AS webAppUrl, shared_token AS sharedToken FROM user_connector WHERE user_id=?`).get(userId) as any;
+async function getConnector(userId: string): Promise<{ webAppUrl: string; sharedToken: string } | undefined> {
+  return await storage.getCalendarConnector(userId);
 }
-function getColleague(alias: string): { email?: string; ics_url?: string } | undefined {
-  return db.prepare(`SELECT email, ics_url FROM colleagues WHERE alias=?`).get(alias.toLowerCase()) as any;
+
+async function getColleague(alias: string): Promise<{ email?: string; icsUrl?: string } | undefined> {
+  const colleagues = await storage.listCalendarColleagues();
+  const colleague = colleagues.find(c => c.alias.toLowerCase() === alias.toLowerCase());
+  if (!colleague) return undefined;
+  return {
+    email: colleague.email || undefined,
+    icsUrl: colleague.icsUrl || undefined,
+  };
 }
 
 async function callGAS(url: string, payload: any) {
@@ -22,7 +27,7 @@ export async function scheduleViaProxy(userId: string, args: {
   title: string; date: string; preferredStart?: string | null; durationMins: number; tz: string;
   workHours?: { start: string; end: string }; attendeeAlias?: string;
 }) {
-  const c = getConnector(userId);
+  const c = await getConnector(userId);
   if (!c) throw new Error("No connector saved for this userId. Open Calendar Credentials and Save Connector.");
   const body: any = {
     action: "schedule",
@@ -33,8 +38,8 @@ export async function scheduleViaProxy(userId: string, args: {
     workHours: args.workHours || { start: "09:00", end: "18:00" }
   };
   if (args.attendeeAlias) {
-    const hit = getColleague(args.attendeeAlias);
-    if (hit?.ics_url) body.coworkerICS = hit.ics_url;
+    const hit = await getColleague(args.attendeeAlias);
+    if (hit?.icsUrl) body.coworkerICS = hit.icsUrl;
     if (hit?.email) body.attendeeEmail = hit.email;
   }
   return await callGAS(c.webAppUrl, body);
@@ -43,7 +48,7 @@ export async function scheduleViaProxy(userId: string, args: {
 export async function freeViaProxy(userId: string, args: {
   date: string; durationMins: number; tz: string; workHours?: { start: string; end: string }; attendeeAlias?: string;
 }) {
-  const c = getConnector(userId);
+  const c = await getConnector(userId);
   if (!c) throw new Error("No connector saved for this userId.");
   const body: any = {
     action: "getFreeSlots",
@@ -52,8 +57,8 @@ export async function freeViaProxy(userId: string, args: {
     workHours: args.workHours || { start: "09:00", end: "18:00" }
   };
   if (args.attendeeAlias) {
-    const hit = getColleague(args.attendeeAlias);
-    if (hit?.ics_url) body.coworkerICS = hit.ics_url;
+    const hit = await getColleague(args.attendeeAlias);
+    if (hit?.icsUrl) body.coworkerICS = hit.icsUrl;
   }
   return await callGAS(c.webAppUrl, body);
 }

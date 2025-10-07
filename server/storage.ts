@@ -6,6 +6,8 @@ import {
   type InsertConversation,
   type ConversationMessage,
   type InsertConversationMessage,
+  calendarConnectors,
+  calendarColleagues,
 } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -27,6 +29,13 @@ export interface IStorage {
   createMessage(message: InsertConversationMessage): Promise<ConversationMessage>;
   getMessages(conversationId: string): Promise<ConversationMessage[]>;
   deleteMessages(conversationId: string): Promise<void>;
+  
+  // Calendar credentials methods
+  upsertCalendarConnector(userId: string, webAppUrl: string, sharedToken: string): Promise<void>;
+  getCalendarConnector(userId: string): Promise<{ userId: string; webAppUrl: string; sharedToken: string } | undefined>;
+  upsertCalendarColleague(alias: string, email?: string, icsUrl?: string): Promise<void>;
+  deleteCalendarColleague(alias: string): Promise<void>;
+  listCalendarColleagues(): Promise<{ alias: string; email?: string | null; icsUrl?: string | null }[]>;
 }
 
 import { db } from "./db";
@@ -95,6 +104,37 @@ export class DbStorage implements IStorage {
   
   async deleteMessages(conversationId: string): Promise<void> {
     await db.delete(conversationMessages).where(eq(conversationMessages.conversationId, conversationId));
+  }
+  
+  async upsertCalendarConnector(userId: string, webAppUrl: string, sharedToken: string): Promise<void> {
+    await db.insert(calendarConnectors)
+      .values({ userId, webAppUrl, sharedToken, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: calendarConnectors.userId,
+        set: { webAppUrl, sharedToken, updatedAt: new Date() }
+      });
+  }
+  
+  async getCalendarConnector(userId: string): Promise<{ userId: string; webAppUrl: string; sharedToken: string } | undefined> {
+    const result = await db.select().from(calendarConnectors).where(eq(calendarConnectors.userId, userId)).limit(1);
+    return result[0];
+  }
+  
+  async upsertCalendarColleague(alias: string, email?: string, icsUrl?: string): Promise<void> {
+    await db.insert(calendarColleagues)
+      .values({ alias: alias.toLowerCase(), email: email || null, icsUrl: icsUrl || null, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: calendarColleagues.alias,
+        set: { email: email || null, icsUrl: icsUrl || null, updatedAt: new Date() }
+      });
+  }
+  
+  async deleteCalendarColleague(alias: string): Promise<void> {
+    await db.delete(calendarColleagues).where(eq(calendarColleagues.alias, alias.toLowerCase()));
+  }
+  
+  async listCalendarColleagues(): Promise<{ alias: string; email?: string | null; icsUrl?: string | null }[]> {
+    return await db.select().from(calendarColleagues);
   }
 }
 
