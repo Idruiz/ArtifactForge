@@ -178,37 +178,38 @@ export async function toCalendar(params: {
   userId?: string;
 }): Promise<BridgeResult> {
   try {
-    // Try calendar-proxy/command endpoint first
-    const response = await axios.post('http://localhost:5000/calendar-proxy/command', {
-      user_id: params.userId || 'default',
-      command: params.command,
+    // Use the working calendar-book/command endpoint
+    const response = await axios.post('http://localhost:5000/calendar-book/command', {
+      userId: params.userId || 'idruiz12@gmail.com',
+      text: params.command,
+      tz: 'America/Vancouver',
+      workHours: { start: '09:00', end: '18:00' },
     });
 
     const data = response.data;
 
-    if (data.intent === 'schedule_direct' && data.event) {
+    // Check for successful booking
+    if (data.eventId && data.htmlLink) {
       return {
         ok: true,
         intent: 'CALENDAR',
-        actionTaken: `Created calendar event: "${data.event.summary}"`,
+        actionTaken: `Created calendar event successfully`,
         event: {
-          id: data.event.id || 'unknown',
-          htmlLink: data.event.htmlLink || '',
+          id: data.eventId,
+          htmlLink: data.htmlLink,
         },
+        followup: `Event created! View it here: ${data.htmlLink}`,
       };
-    } else if (data.intent === 'find_free' && data.free_slots) {
-      const slots = data.free_slots.slice(0, 3).map((s: any) => s.start).join(', ');
+    }
+
+    // Handle free slots response
+    if (data.freeSlots && Array.isArray(data.freeSlots)) {
+      const slots = data.freeSlots.slice(0, 3).map((s: any) => s.start).join(', ');
       return {
         ok: true,
         intent: 'CALENDAR',
-        actionTaken: `Found ${data.free_slots.length} free slots`,
+        actionTaken: `Found ${data.freeSlots.length} free slots`,
         followup: `Available times: ${slots}. Say "book the first one" to schedule.`,
-      };
-    } else if (data.intent === 'teach_alias' && data.alias) {
-      return {
-        ok: true,
-        intent: 'CALENDAR',
-        actionTaken: `Saved alias: "${data.alias.alias}" → ${data.alias.target}`,
       };
     }
 
@@ -219,12 +220,13 @@ export async function toCalendar(params: {
       followup: data.message || 'Please try rephrasing your calendar request.',
     };
   } catch (err: any) {
+    const errorMsg = err.response?.data?.error || err.message || 'Unknown error';
     return {
       ok: false,
       intent: 'CALENDAR',
       actionTaken: 'Calendar action failed',
-      error: err.response?.data?.error || err.message || 'Unknown error',
-      followup: 'Make sure you have configured the Calendar Agent in the sidebar.',
+      error: errorMsg,
+      followup: `Error: ${errorMsg}`,
     };
   }
 }
