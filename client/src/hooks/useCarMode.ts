@@ -199,6 +199,8 @@ export function useCarMode(
         
         isPlayingRef.current = true;
         
+        console.log("[Car Mode TTS] Fetching OpenAI audio for:", text.substring(0, 50) + "...");
+        
         // Fetch TTS audio from OpenAI via our backend
         const r = await fetch("/car-v2/tts", {
           method: "POST",
@@ -207,13 +209,19 @@ export function useCarMode(
         });
         
         if (!r.ok) {
-          console.error("TTS failed:", await r.text());
+          const errorText = await r.text();
+          console.error("[Car Mode TTS] ❌ OpenAI TTS endpoint failed:", r.status, errorText);
+          console.error("[Car Mode TTS] ❌ NO FALLBACK - Audio will NOT play");
           isPlayingRef.current = false;
           continue;
         }
         
+        const contentType = r.headers.get("content-type");
+        console.log("[Car Mode TTS] ✅ Received audio response, Content-Type:", contentType);
+        
         // Get audio buffer and play
         const arrayBuffer = await r.arrayBuffer();
+        console.log("[Car Mode TTS] Audio buffer size:", arrayBuffer.byteLength, "bytes");
         
         if (!audioCtxForPlaybackRef.current) {
           audioCtxForPlaybackRef.current = new AudioContext();
@@ -223,6 +231,8 @@ export function useCarMode(
         await ctx.resume();
         
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        console.log("[Car Mode TTS] 🎵 Playing OpenAI audio (duration:", audioBuffer.duration.toFixed(2), "seconds)");
+        
         const source = ctx.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(ctx.destination);
@@ -232,6 +242,7 @@ export function useCarMode(
         // Wait for audio to finish playing
         await new Promise<void>((resolve) => {
           source.onended = () => {
+            console.log("[Car Mode TTS] ✅ Audio playback completed");
             isPlayingRef.current = false;
             resolve();
           };
@@ -239,7 +250,8 @@ export function useCarMode(
         });
       }
     } catch (e: any) {
-      console.error("TTS error:", e.message);
+      console.error("[Car Mode TTS] ❌ CRITICAL ERROR:", e.message, e.stack);
+      console.error("[Car Mode TTS] ❌ This should NEVER trigger browser voices");
       isPlayingRef.current = false;
     }
   }, []);

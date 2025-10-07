@@ -56,8 +56,16 @@ function tmpPath(ext: string) {
 router.post("/tts", async (req, res) => {
   try {
     const { text } = req.body;
-    if (!text) return res.status(400).json({ error: "text required" });
-    if (!OPENAI_API_KEY) return res.status(500).json({ error: "OPENAI_API_KEY not set" });
+    if (!text) {
+      console.error("[CARV2 TTS] ❌ No text provided");
+      return res.status(400).json({ error: "text required" });
+    }
+    if (!OPENAI_API_KEY) {
+      console.error("[CARV2 TTS] ❌ OPENAI_API_KEY not configured");
+      return res.status(500).json({ error: "OPENAI_API_KEY not set" });
+    }
+
+    console.log("[CARV2 TTS] 🎤 Generating OpenAI audio (nova voice) for:", text.substring(0, 60) + "...");
 
     // Call OpenAI TTS API
     const r = await fetch("https://api.openai.com/v1/audio/speech", {
@@ -69,21 +77,25 @@ router.post("/tts", async (req, res) => {
       body: JSON.stringify({
         model: "tts-1",
         input: text.slice(0, 4096), // Max 4096 chars
-        voice: "alloy", // Options: alloy, echo, fable, onyx, nova, shimmer
-        response_format: "mp3"
+        voice: "nova", // Most natural female voice - Options: alloy, echo, fable, onyx, nova, shimmer
+        response_format: "mp3",
+        speed: 1.0 // Normal speed for natural conversation
       })
     });
 
     if (!r.ok) {
       const err = await r.text().catch(() => "");
+      console.error("[CARV2 TTS] ❌ OpenAI API failed:", r.status, err);
       return res.status(502).json({ error: "TTS failure", detail: err });
     }
 
     // Stream audio back to client
     const buffer = await r.arrayBuffer();
+    console.log("[CARV2 TTS] ✅ Generated", buffer.byteLength, "bytes of OpenAI audio/mpeg");
     res.setHeader("Content-Type", "audio/mpeg");
     res.send(Buffer.from(buffer));
   } catch (e: any) {
+    console.error("[CARV2 TTS] ❌ EXCEPTION:", e.message);
     return res.status(500).json({ error: e.message });
   }
 });
