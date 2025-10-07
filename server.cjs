@@ -1,4 +1,4 @@
-// server.cjs — auto-detect agent UI (prefer public build)
+// server.cjs — auto-detect agent UI (prefer dist/public, then public)
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -6,15 +6,17 @@ const fs = require('fs');
 const app = express();
 const ROOT = __dirname;
 
-// Candidate agent roots (FIRST match wins) — PUBLIC FIRST
+// Candidate agent roots (FIRST match wins)
 const CANDIDATE_DIRS = [
-  path.join(ROOT, 'public'),               // repo-root/public (preferred)
-  path.join(ROOT, 'client', 'dist', 'public'), // Vite builds like dist/public/...
-  path.join(ROOT, 'client', 'dist'),       // other build setups
+  path.join(ROOT, 'dist', 'public'),      // <-- your Vite build (seen in logs)
+  path.join(ROOT, 'public'),              // repo-root/public
+  path.join(ROOT, 'dist'),                // sometimes SPA lands directly in dist/
+  path.join(ROOT, 'client', 'dist', 'public'),
+  path.join(ROOT, 'client', 'dist'),
   path.join(ROOT, 'site', 'agent'),
   path.join(ROOT, 'agent'),
   path.join(ROOT, 'site', 'admin'),
-  path.join(ROOT, 'admin')                 // CMS last; only if nothing else
+  path.join(ROOT, 'admin')                // CMS LAST
 ];
 
 // Candidate index filenames
@@ -50,7 +52,7 @@ app.use('/agent', express.static(AGENT_DIR));
 // 2) Root redirects to the agent
 app.get('/', (_req, res) => res.redirect(`/agent/${AGENT_INDEX}`));
 
-// 3) Keep CMS at /admin (if you need it)
+// 3) Keep CMS at /admin (if present)
 if (fs.existsSync(CMS_DIR)) {
   app.use('/admin', express.static(CMS_DIR, { extensions: ['html'] }));
   app.get('/admin', (_req, res) => res.sendFile(path.join(CMS_DIR, 'index.html')));
