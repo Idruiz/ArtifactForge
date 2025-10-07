@@ -1,0 +1,91 @@
+Prove booking works now. Use existing creds from /calendar-cred/state. If needed, re-register silently. Then book once via direct API (bulletproof) and once via NLP.
+
+Constants
+
+USER_ID = idruiz12@gmail.com (or whatever key we used when saving creds)
+
+TZ = America/Vancouver
+
+Use the app’s current base URL (same as before).
+
+1) Health check (server + backend)
+GET /health
+EXPECT: {"ok":true,"backend":"proxy"}
+IF not proxy → set CALENDAR_BACKEND=proxy in deployment and retry.
+
+2) Load saved connector (must exist)
+GET /calendar-cred/state?userId=USER_ID
+EXPECT: body.connector.web_app_url and body.connector.shared_token are non-empty.
+IF connector is null → STOP and report: "No connector saved."
+
+3) Re-register (idempotent, uses values from state)
+POST /calendar-cred/user
+{
+  "userId":"USER_ID",
+  "webAppUrl":"<state.connector.web_app_url>",
+  "sharedToken":"<state.connector.shared_token>"
+}
+EXPECT: {"ok":true,"registered":true}
+
+4) Direct booking (no NLP, minimal surface area)
+
+DATE = tomorrow (YYYY-MM-DD)
+
+START = "12:30"
+
+POST /calendar-book/schedule
+{
+  "userId":"USER_ID",
+  "title":"Post-fix Proof",
+  "date":"<DATE>",
+  "preferredStart":"12:30",
+  "durationMins":30,
+  "tz":"TZ"
+}
+EXPECT: JSON containing "eventId" and "htmlLink".
+ON FAIL: return the exact JSON body; do not summarize.
+
+5) NLP booking (natural sentence)
+POST /calendar-book/command
+{
+  "userId":"USER_ID",
+  "text":"create a team meeting tomorrow at 1:15 pm for 30 minutes",
+  "tz":"TZ",
+  "workHours":{"start":"09:00","end":"18:00"}
+}
+EXPECT: "eventId" and "htmlLink".
+IF response is a free-slot list (no exact time free) → pick the first window and call /calendar-book/schedule with that start time.
+
+6) (Optional) Invite a colleague alias (only if alias exists)
+
+If alias "inarvis" was saved earlier:
+
+POST /calendar-book/schedule
+{
+  "userId":"USER_ID",
+  "title":"With Alias",
+  "date":"<DATE>",
+  "preferredStart":"15:00",
+  "durationMins":30,
+  "tz":"TZ",
+  "attendeeAlias":"inarvis"
+}
+EXPECT: "eventId","htmlLink"
+
+
+If alias isn’t saved, do not block booking — book without attendee and report that no invite was sent.
+
+7) Success response format (what you show the user)
+Booked ✅ Post-fix Proof
+When: <local date & time> — 30m
+Link: <htmlLink>
+
+8) Error policy (no fluff)
+
+If any step fails, return the raw JSON you received (status + body).
+
+Do not ask to “configure the sidebar”.
+
+If a booking call says Unauthorized/Not registered: redo step 3 (re-register using values from state), then retry the booking once.
+
+That’s it. This proves the pipeline after your GAS fix, using the creds you already stored, with zero UI detours.
