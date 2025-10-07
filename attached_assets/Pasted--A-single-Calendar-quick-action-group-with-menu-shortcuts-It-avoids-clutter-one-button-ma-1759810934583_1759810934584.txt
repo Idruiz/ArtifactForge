@@ -1,0 +1,125 @@
+// A single "Calendar" quick action group with menu shortcuts.
+// It avoids clutter: one button → many actions in a popover.
+// Integrate with your UI's quick-actions registry.
+
+type QuickAction = { id: string; label: string; onClick: () => void; icon?: string; hidden?: boolean; };
+type QuickActionGroup = { id: string; label: string; icon?: string; items: QuickAction[]; hidden?: boolean; };
+type AddGroup = (group: QuickActionGroup) => void;
+
+function insertIntoChat(text: string) {
+  // 1) Preferred: fire a custom event your chat input listens for.
+  window.dispatchEvent(new CustomEvent("agent:insert-chat", { detail: text }));
+  // 2) Fallbacks: textarea or contenteditable
+  const ta = document.querySelector<HTMLTextAreaElement>("textarea#chat-input, textarea[name='chat'], textarea");
+  if (ta) { ta.focus(); ta.value = text; ta.dispatchEvent(new Event("input", { bubbles: true })); return; }
+  const ce = document.querySelector<HTMLElement>("[contenteditable='true']");
+  if (ce) { ce.focus(); document.execCommand("insertText", false, text); }
+}
+
+// Small helpers for terse templates
+const q = (s: string) => `“${s}”`;
+const dt = "<date: tomorrow | 2025-10-08 | next Tuesday>";
+const tm = "<time: 3:00 pm | 15:00>";
+const dur = "<duration: 30m | 45m | 1h>";
+const who = "<attendee: email or “Name”>";
+const cal = "<target calendar id/email (optional)>";
+
+export function registerCalendarGroup(addGroup: AddGroup) {
+  addGroup({
+    id: "qa.group.calendar",
+    label: "Calendar",
+    icon: "calendar",        // your icon system
+    hidden: false,           // show the single group; items live inside its menu
+    items: [
+      {
+        id: "cal.book.direct",
+        label: "Book meeting",
+        onClick: () => insertIntoChat(
+          `book a meeting titled "${'<title>'}" on ${dt} at ${tm} for ${dur} with ${who} google meet`
+        )
+      },
+      {
+        id: "cal.book.firstfree",
+        label: "Book first free slot",
+        onClick: () => insertIntoChat(
+          `find a free ${dur} slot on ${dt} with ${who} and book it (google meet)`
+        )
+      },
+      {
+        id: "cal.book.colleague",
+        label: "Book on colleague’s calendar",
+        onClick: () => insertIntoChat(
+          `on ${cal} schedule "${'<title>'}" on ${dt} at ${tm} for ${dur} invite ${who}`
+        )
+      },
+      {
+        id: "cal.invite.only",
+        label: "Invite someone (my calendar)",
+        onClick: () => insertIntoChat(
+          `create "${'<title>'}" on ${dt} at ${tm} for ${dur} and invite ${who}`
+        )
+      },
+      {
+        id: "cal.freebusy.mine",
+        label: "Find my free slots",
+        onClick: () => insertIntoChat(
+          `show up to 5 free windows on ${dt} for ${dur} (work hours 09:00–18:00)`
+        )
+      },
+      {
+        id: "cal.freebusy.colleague",
+        label: "Find colleague free slots",
+        onClick: () => insertIntoChat(
+          `show up to 5 free windows on ${dt} for ${dur} using ${cal}`
+        )
+      },
+      {
+        id: "cal.agenda.today",
+        label: "Today’s agenda",
+        onClick: () => insertIntoChat(`list my agenda for today with links`)
+      },
+      {
+        id: "cal.event.addmeet",
+        label: "Add Google Meet to event",
+        onClick: () => insertIntoChat(
+          `add a google meet link to event ${q("<event link | id>")}`
+        )
+      },
+      {
+        id: "cal.event.reschedule",
+        label: "Reschedule event",
+        onClick: () => insertIntoChat(
+          `reschedule event ${q("<event link | id>")} to ${dt} at ${tm}`
+        )
+      },
+      {
+        id: "cal.event.cancel",
+        label: "Cancel event",
+        onClick: () => insertIntoChat(
+          `cancel event ${q("<event link | id>")} and notify attendees`
+        )
+      },
+      {
+        id: "cal.prefs.hours",
+        label: "Set work hours (default)",
+        onClick: () => insertIntoChat(
+          `set my work hours to start 09:00 end 18:00 (weekdays)`
+        )
+      },
+      {
+        id: "cal.creds.save",
+        label: "Save/Update connector",
+        onClick: () => insertIntoChat(
+          `save calendar connector { webAppUrl: ${q("<apps script exec url>")}, token: ${q("<shared token>")} }`
+        )
+      },
+      {
+        id: "cal.alias.add",
+        label: "Add colleague alias",
+        onClick: () => insertIntoChat(
+          `add calendar alias "${'<name or handle>'}" -> ${q("<email or calendar id>")}`
+        )
+      }
+    ]
+  });
+}

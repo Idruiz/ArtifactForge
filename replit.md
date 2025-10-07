@@ -67,3 +67,4 @@ Preferred communication style: Simple, everyday language.
 
 ### Calendar Integration
 - **Google Apps Script (via proxy)**: For hands-free natural language calendar scheduling.
+- **Date Normalization**: Production-safe date phrase resolver (`server/lib/resolveDate.ts`) handles natural language dates ("tomorrow", "next Tuesday", "Oct 7th") and converts to YYYY-MM-DD format before sending to Google Calendar API. Supports timezone-aware parsing with no external dependencies.
