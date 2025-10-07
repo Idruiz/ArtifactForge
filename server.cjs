@@ -44,6 +44,14 @@ console.log('  -> CMS_DIR  =', CMS_DIR,  fs.existsSync(CMS_DIR)  ? '(exists)' : 
 
 // 1) Mount the agent (auto-detected) at /agent
 app.use('/agent', express.static(AGENT_DIR));
+// Make absolute asset paths work (the build requests /assets/* at the root)
+const agentAssetsDir = path.join(AGENT_DIR, 'assets');
+if (fs.existsSync(agentAssetsDir)) {
+  app.use('/assets', express.static(agentAssetsDir, {
+    immutable: true,
+    maxAge: '1y'
+  }));
+}
 
 // 2) Root -> agent
 app.get('/', (_req, res) => res.redirect(`/agent/${AGENT_INDEX}`));
