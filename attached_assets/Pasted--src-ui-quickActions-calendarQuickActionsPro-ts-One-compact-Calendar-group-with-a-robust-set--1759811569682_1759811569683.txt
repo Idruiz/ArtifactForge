@@ -1,0 +1,261 @@
+// src/ui/quickActions/calendarQuickActionsPro.ts
+// One compact "Calendar" group with a robust set of shortcuts covering all current capabilities.
+// Each shortcut inserts a ready-to-edit template into the chat input. Main flow remains voice/text.
+
+// -------------------------------
+// Types – adapt to your quick-actions registry
+// -------------------------------
+type QuickAction = { id: string; label: string; onClick: () => void; icon?: string; hidden?: boolean; };
+type QuickActionGroup = { id: string; label: string; icon?: string; items: QuickAction[]; hidden?: boolean; };
+type AddGroup = (group: QuickActionGroup) => void;
+
+// -------------------------------
+// Chat insertion helper (framework-agnostic)
+// -------------------------------
+function insertIntoChat(text: string) {
+  try { window.dispatchEvent(new CustomEvent("agent:insert-chat", { detail: text })); } catch {}
+  const ta =
+    document.querySelector<HTMLTextAreaElement>("textarea#chat-input") ||
+    document.querySelector<HTMLTextAreaElement>("textarea[name='chat']") ||
+    document.querySelector<HTMLTextAreaElement>("textarea");
+  if (ta) { ta.focus(); ta.value = text; ta.dispatchEvent(new Event("input", { bubbles: true })); return; }
+  const ce = document.querySelector<HTMLElement>("[contenteditable='true']");
+  if (ce) { ce.focus(); document.execCommand("insertText", false, text); }
+}
+
+// -------------------------------
+// Shared, terse placeholders
+// -------------------------------
+const dt   = "<date: tomorrow | 2025-10-08 | next Tuesday>";
+const tm   = "<time: 3:00 pm | 15:00>";
+const dur  = "<duration: 30m | 45m | 1h>";
+const who  = "<attendee(s): email(s) or “Name(s)”>";
+const cal  = "<target calendar id/email>";
+const eid  = "<event link | id>";
+const tz   = "<tz: America/Los_Angeles | America/Vancouver>";
+const hrsS = "<start HH:mm>";  // e.g., 09:00
+const hrsE = "<end HH:mm>";    // e.g., 18:00
+
+// -------------------------------
+// Register one Calendar group with a broad, robust menu
+// -------------------------------
+export function registerCalendarQuickActions(addGroup: AddGroup) {
+  const items: QuickAction[] = [
+    // ==== CORE BOOKING ====
+    {
+      id: "cal.book.direct",
+      label: "Book at a specific time",
+      onClick: () =>
+        insertIntoChat(
+          `book a meeting titled "${'<title>'}" on ${dt} at ${tm} for ${dur} with ${who} google meet`
+        ),
+    },
+    {
+      id: "cal.book.firstfree",
+      label: "Book first free slot (my calendar)",
+      onClick: () =>
+        insertIntoChat(
+          `find a free ${dur} slot on ${dt} within work hours and book it with ${who} google meet`
+        ),
+    },
+    {
+      id: "cal.book.colleague",
+      label: "Book on a colleague’s calendar",
+      onClick: () =>
+        insertIntoChat(
+          `on ${cal} schedule "${'<title>'}" on ${dt} at ${tm} for ${dur} and invite ${who} google meet`
+        ),
+    },
+    {
+      id: "cal.book.recurring",
+      label: "Book a recurring series",
+      onClick: () =>
+        insertIntoChat(
+          `create a weekly recurring meeting titled "${'<title>'}" starting ${dt} at ${tm} for ${dur} with ${who} for <count: 6> occurrences google meet`
+        ),
+    },
+
+    // ==== FREE/BUSY DISCOVERY ====
+    {
+      id: "cal.freebusy.mine",
+      label: "Find my free slots",
+      onClick: () =>
+        insertIntoChat(
+          `show up to 5 free windows on ${dt} for ${dur} (use my work hours)`
+        ),
+    },
+    {
+      id: "cal.freebusy.colleague",
+      label: "Find free slots (colleague)",
+      onClick: () =>
+        insertIntoChat(
+          `using ${cal} show up to 5 free windows on ${dt} for ${dur}`
+        ),
+    },
+    {
+      id: "cal.freebusy.mutual",
+      label: "Find mutual free slot (me + colleague)",
+      onClick: () =>
+        insertIntoChat(
+          `find the first mutual free ${dur} slot on ${dt} between my calendar and ${cal} and book it with ${who}`
+        ),
+    },
+
+    // ==== EVENT OPERATIONS ====
+    {
+      id: "cal.event.addmeet",
+      label: "Add Google Meet to an event",
+      onClick: () =>
+        insertIntoChat(
+          `add a google meet link to event “${eid}”`
+        ),
+    },
+    {
+      id: "cal.event.update",
+      label: "Update title/description/location",
+      onClick: () =>
+        insertIntoChat(
+          `update event “${eid}” set title "${'<new title>'}", description "${'<notes>'}", location "${'<location>'}"`
+        ),
+    },
+    {
+      id: "cal.event.addAttendee",
+      label: "Add attendee(s) to event",
+      onClick: () =>
+        insertIntoChat(
+          `add attendee(s) ${who} to event “${eid}” (send updates)`
+        ),
+    },
+    {
+      id: "cal.event.removeAttendee",
+      label: "Remove attendee from event",
+      onClick: () =>
+        insertIntoChat(
+          `remove attendee ${"<email or Name>"} from event “${eid}” (send updates)`
+        ),
+    },
+    {
+      id: "cal.event.extend",
+      label: "Extend/shorten event",
+      onClick: () =>
+        insertIntoChat(
+          `change duration of event “${eid}” to ${dur}`
+        ),
+    },
+    {
+      id: "cal.event.reschedule",
+      label: "Reschedule event",
+      onClick: () =>
+        insertIntoChat(
+          `reschedule event “${eid}” to ${dt} at ${tm}`
+        ),
+    },
+    {
+      id: "cal.event.moveCalendar",
+      label: "Move event to another calendar",
+      onClick: () =>
+        insertIntoChat(
+          `move event “${eid}” to calendar ${cal} (preserve attendees)`
+        ),
+    },
+    {
+      id: "cal.event.cancel",
+      label: "Cancel event (notify)",
+      onClick: () =>
+        insertIntoChat(
+          `cancel event “${eid}” and notify attendees`
+        ),
+    },
+
+    // ==== AGENDA / VIEWS ====
+    {
+      id: "cal.agenda.today",
+      label: "Today’s agenda (links)",
+      onClick: () => insertIntoChat(`list my agenda for today with links`),
+    },
+    {
+      id: "cal.agenda.range",
+      label: "Agenda for a date range",
+      onClick: () =>
+        insertIntoChat(
+          `list my agenda from <start: 2025-10-07> to <end: 2025-10-10> with links`
+        ),
+    },
+
+    // ==== PREFERENCES / CONNECTOR ====
+    {
+      id: "cal.prefs.hours",
+      label: "Set default work hours",
+      onClick: () =>
+        insertIntoChat(
+          `set my work hours to start ${hrsS} end ${hrsE} (weekdays)`
+        ),
+    },
+    {
+      id: "cal.prefs.tz",
+      label: "Set default timezone",
+      onClick: () =>
+        insertIntoChat(
+          `set my calendar timezone to ${tz}`
+        ),
+    },
+    {
+      id: "cal.creds.save",
+      label: "Save/Update connector",
+      onClick: () =>
+        insertIntoChat(
+          `save calendar connector { webAppUrl: “${"<apps script exec url>"}”, token: “${"<shared token>"}” }`
+        ),
+    },
+    {
+      id: "cal.alias.add",
+      label: "Add colleague alias",
+      onClick: () =>
+        insertIntoChat(
+          `add calendar alias "${'<name or handle>'}" -> “${"<email or calendar id>"}”`
+        ),
+    },
+
+    // ==== POWER USER HELP ====
+    {
+      id: "cal.help.examples",
+      label: "What can I say? (examples)",
+      onClick: () =>
+        insertIntoChat(
+`Examples you can paste/edit:
+- book a meeting tomorrow at 3.00 pm with "Inarvis" for 30m google meet
+- find a free 45m slot next Tuesday afternoon with boss and book it
+- on boss@company.com schedule "Design Review" on 2025-10-09 at 11:00 for 1h invite pm@company.com
+- list my agenda for today with links
+- reschedule event "<event link>" to tomorrow at 10:30
+- cancel event "<event link>" and notify attendees
+- set my work hours to start 09:00 end 18:00 (weekdays)`
+        ),
+    },
+  ];
+
+  addGroup({
+    id: "qa.group.calendar",
+    label: "Calendar",
+    icon: "calendar", // adapt to your icon system
+    items,
+    hidden: false, // one visible group; items show in its popover/menu
+  });
+}
+
+export default registerCalendarQuickActions;
+
+/*
+HOW TO USE
+
+// During UI boot:
+import registerCalendarQuickActions from "./calendarQuickActionsPro";
+
+const groups: any[] = [];
+function addGroup(g: any) { groups.push(g); /* render group as a single "Calendar" button with a popover menu */ }
+
+registerCalendarQuickActions(addGroup);
+
+// Each menu item inserts a best-practice prompt into the chat input.
+// Your backend's command route + shim/date-resolver will handle messy user edits (tmrw, 3.00 pm, etc).
+*/

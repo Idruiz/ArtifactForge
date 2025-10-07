@@ -23,7 +23,6 @@ import {
   Globe,
   TrendingUp,
   ArrowDown,
-  Calendar,
 } from "lucide-react";
 import type {
   AgentStatus,
@@ -34,6 +33,7 @@ import type {
 } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { ConversationSidebar } from "./ConversationSidebar";
+import { CalendarQuickActions } from "./CalendarQuickActions";
 
 interface Props {
   agentStatus: AgentStatus;
@@ -276,19 +276,9 @@ export function AgentWorkspace(p: Props) {
                     ))}
                     
                     <div className="pt-2 mt-2 border-t border-gray-200 space-y-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => p.onQuickAction("calendar")}
-                        className="w-full justify-start text-blue-600 border-blue-200 hover:bg-blue-50"
-                        data-testid="button-quick-calendar"
-                      >
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Calendar Agent
-                        <Badge variant="secondary" className="ml-auto text-[10px] px-1.5">
-                          Beta
-                        </Badge>
-                      </Button>
+                      <CalendarQuickActions 
+                        onInsertTemplate={(template) => p.onQuickAction(`template:${template}`)}
+                      />
                     </div>
                   </div>
                 </div>

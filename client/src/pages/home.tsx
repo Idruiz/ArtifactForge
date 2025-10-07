@@ -330,6 +330,20 @@ export default function Home() {
   const [showCalendarPanel, setShowCalendarPanel] = useState(false);
 
   const handleQuickAction = (action: string) => {
+    // Handle template insertion from calendar quick actions
+    if (action.startsWith("template:")) {
+      const template = action.substring(9); // Remove "template:" prefix
+      setChatInput(template);
+      setTimeout(() => {
+        const input = document.querySelector<HTMLTextAreaElement>('textarea[data-testid="input-chat"]');
+        if (input) {
+          input.focus();
+          input.setSelectionRange(template.length, template.length);
+        }
+      }, 100);
+      return;
+    }
+
     if (action === "calendar") {
       setShowCalendarPanel(true);
       return;
