@@ -1,8 +1,10 @@
 import express from "express";
 import Database from "better-sqlite3";
+import path from "path";
 
 const router = express.Router();
-const db = new Database("calendar_credentials.db");
+const dbPath = path.join(process.cwd(), "data", "calendar_credentials.db");
+const db = new Database(dbPath);
 db.exec(`
 CREATE TABLE IF NOT EXISTS user_connector (
   user_id TEXT PRIMARY KEY,
