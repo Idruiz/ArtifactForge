@@ -107,8 +107,15 @@ app.use("/sites", sitesRouter);
     }
   });
 
-  // Simple health check
+  // Health check endpoints
+  app.get("/health", (_req, res) => res.json({ ok: true, backend: "proxy" }));
   app.get("/healthz", (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
+  
+  // Readiness check
+  app.get("/ready", (_req, res) => {
+    const hasToken = !!process.env.GAS_SHARED_TOKEN;
+    res.status(hasToken ? 200 : 503).json({ ok: hasToken, ts: Date.now() });
+  });
 
   // ─── global error handler ───
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -128,6 +135,17 @@ app.use("/sites", sitesRouter);
 
   // ─── start HTTP server ───
   const port = parseInt(process.env.PORT || (process.env.K_SERVICE ? "8080" : "5000"), 10);
+  
+  // Log key environment variables on boot
+  log(`[ENV] NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+  log(`[ENV] DB_DIR: ${process.env.DB_DIR || '/home/runner/workspace/data'}`);
+  log(`[ENV] GAS_WEB_APP_URL: ${process.env.GAS_WEB_APP_URL ? process.env.GAS_WEB_APP_URL.substring(0, 50) + '...' : 'NOT SET'}`);
+  log(`[ENV] GAS_SHARED_TOKEN: ${process.env.GAS_SHARED_TOKEN ? 'SET (hidden)' : 'NOT SET'}`);
+  
+  if (!process.env.GAS_SHARED_TOKEN) {
+    console.warn('WARNING: GAS_SHARED_TOKEN not set - calendar booking will fail');
+  }
+  
   server.listen({ port, host: "0.0.0.0", reusePort: true }, () =>
     log(`serving on port ${port}`),
   );

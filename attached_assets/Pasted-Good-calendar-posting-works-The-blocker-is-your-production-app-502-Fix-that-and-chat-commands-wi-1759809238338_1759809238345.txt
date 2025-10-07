@@ -1,0 +1,146 @@
+Good—calendar posting works. The blocker is your production app = 502. Fix that and chat commands will work the same as the direct test.
+
+Here’s the fastest, no-guess path to make prod green.
+
+0) What 502 means here
+
+Replit’s proxy can’t reach your server (didn’t bind to PORT, crashed, or wrong start command). We’ll pin all three.
+
+1) Start command + port (creates a real “Run” in prod)
+
+.replit
+
+run = "npm run dev"
+
+[deployment]
+run = "npm start"
+
+
+package.json
+
+"scripts": {
+  "dev": "ts-node-dev --transpile-only --respawn src/index.ts",
+  "build": "tsc -p tsconfig.json",
+  "start": "node dist/index.js"
+}
+
+
+src/index.ts
+
+const PORT = Number(process.env.PORT || 3000);
+app.get("/health", (_req,res)=>res.json({ok:true, backend:"proxy"}));
+app.listen(PORT, () => console.log("listening on", PORT));
+
+2) Absolute DB path (prevents “works in dev, dies in prod”)
+// src/lib/db.ts
+import fs from "fs"; import path from "path"; import Database from "better-sqlite3";
+export function openDb(filename: string) {
+  const root = process.env.DB_DIR || "/home/runner/workspace/data";
+  fs.mkdirSync(root, { recursive: true });
+  return new Database(path.join(root, filename));
+}
+
+
+Replace any new Database(...) with openDb("calendar_credentials.db").
+
+3) Deployment env (prod only)
+
+In Replit → Deploy → Edit Environment, set:
+
+PORT                           (auto; leave)
+DB_DIR=/home/runner/workspace/data
+CALENDAR_BACKEND=proxy
+CALENDAR_WEBAPP_URL=<your Apps Script exec URL>
+CALENDAR_SHARED_TOKEN=GASX-97e1c6f2a4b0459a-0fb12a3d37
+AGENT_BASE_URL=https://<your-replit-deployment-url>
+NODE_ENV=production
+
+4) Health check path in Deployment
+
+Set Health Check Path to /health. Replit will only mark it healthy when that returns 200.
+
+5) Redeploy (prod, not preview)
+
+Deploy → Stop (if running) → Deploy. Wait for “Healthy”.
+
+6) Smoke test (prove it’s up)
+
+From any shell (or Replit Shell):
+
+APP=https://<your-replit-deployment-url>
+curl -sS $APP/health
+# expect: {"ok":true,"backend":"proxy"}
+
+7) Re-register connector (idempotent) and book via prod
+USER=idruiz12@gmail.com
+curl -sS -X POST $APP/calendar-cred/user \
+ -H 'Content-Type: application/json' \
+ -d '{"userId":"'"$USER"'","webAppUrl":"'"$CALENDAR_WEBAPP_URL"'","sharedToken":"'"$CALENDAR_SHARED_TOKEN"'"}'
+
+TOM=$(date -d "+1 day" +%Y-%m-%d 2>/dev/null || gdate -d "+1 day" +%Y-%m-%d)
+curl -sS -X POST $APP/calendar-book/schedule \
+ -H 'Content-Type: application/json' \
+ -d '{
+  "userId":"'"$USER"'",
+  "title":"Chat Path Proof",
+  "date":"'"$TOM"'",
+  "preferredStart":"15:00",
+  "durationMins":30,
+  "tz":"America/Los_Angeles",
+  "attendeeAlias":"inarvis"
+ }'
+
+
+Expect JSON with eventId and htmlLink.
+
+8) Make the chat agent use prod (no more preview)
+
+Wherever the agent stores the base URL, set:
+
+AGENT_BASE_URL=https://<your-replit-deployment-url>
+
+
+And make your agent do this fallback:
+
+Call POST $AGENT_BASE_URL/calendar-book/command.
+
+If 5xx or NetworkError, retry once against the preview URL.
+
+If still failing, return the raw JSON (don’t “rephrase” the user).
+
+9) Quick “it can’t regress” guardrails
+
+On boot, log process.env.CALENDAR_BACKEND, DB_DIR, and webAppUrl substring.
+
+Crash on missing CALENDAR_SHARED_TOKEN with a clear line: FATAL: missing CALENDAR_SHARED_TOKEN.
+
+Add a tiny readiness probe:
+
+app.get("/ready", (_req,res)=>{
+  const ok = !!process.env.CALENDAR_SHARED_TOKEN;
+  res.status(ok?200:503).json({ok, ts:Date.now()});
+});
+
+10) If you still see 502
+
+Run:
+
+# in Replit Shell
+ps aux | grep node
+# if ghost node: kill it, then:
+npm run build && npm start
+
+
+Common culprits:
+
+Not listening on process.env.PORT
+
+Bad start script
+
+Missing envs in deployment (they don’t inherit your dev panel)
+
+DB path not writable (fix with DB_DIR above)
+
+TL;DR
+
+Your Apps Script + proxy are fine (you just created a real event). The chat path breaks because prod is 502. Fix the start command, bind to PORT, absolute DB path, set envs in deployment, health check /health, and point the agent at prod. After that, your “book a meeting…” text will go straight through and post—same as the direct test.
