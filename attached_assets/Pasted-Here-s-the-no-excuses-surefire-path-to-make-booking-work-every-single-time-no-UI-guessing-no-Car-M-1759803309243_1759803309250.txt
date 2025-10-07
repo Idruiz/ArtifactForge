@@ -1,0 +1,135 @@
+Here’s the no-excuses, surefire path to make booking work every single time—no UI guessing, no Car Mode, no “sidebar” nagging. Do this exactly and you’ll get an event link back or a precise error payload you can fix in one move.
+
+0) One permanent code fix (prevents hidden DB failures)
+
+Use an absolute DB path and create the dir. If you already did this, keep it.
+
+// src/lib/db.ts
+import fs from "fs"; import path from "path"; import Database from "better-sqlite3";
+export function openDb(filename: string) {
+  const root = process.env.DB_DIR || "/home/runner/workspace/data";
+  fs.mkdirSync(root, { recursive: true });
+  return new Database(path.join(root, filename));
+}
+
+
+Replace every new Database("…") with:
+
+import { openDb } from "../../lib/db.js";
+const db = openDb("calendar_credentials.db");
+
+1) One environment switch
+
+Deployment secret (not just “Run”):
+
+CALENDAR_BACKEND=proxy
+
+2) One-time connector save (idempotent)
+
+Run these three commands (replace APP, GAS, TOKEN, USER):
+
+APP=https://<your-app-host>   # your Replit web URL
+USER=idruiz12@gmail.com      # or PRIMARY_USER
+GAS=https://script.google.com/macros/s/AKfycbx.../exec
+TOKEN=GASX-xxxxxxxxxxxxxxxx
+
+# 2a) Save connector (also registers the proxy)
+curl -sS -X POST $APP/calendar-cred/user \
+  -H 'Content-Type: application/json' \
+  -d '{"userId":"'"$USER"'","webAppUrl":"'"$GAS"'","sharedToken":"'"$TOKEN"'"}'
+
+# Expect: {"ok":true,"registered":true}
+
+# 2b) Verify persisted state
+curl -sS "$APP/calendar-cred/state?userId=$USER"
+
+# Expect: ..."connector":{"web_app_url":".../exec","shared_token":"..."}...
+
+
+If connector is null, your DB path isn’t fixed. Apply step 0, redeploy, and re-run 2a.
+
+3) (Optional) Add one colleague alias
+
+ICS is nice, not required. Email alone will still send the invite.
+
+curl -sS -X POST $APP/calendar-cred/colleague \
+  -H 'Content-Type: application/json' \
+  -d '{"alias":"inarvis","email":"inarvis@company.com"}'
+
+# Expect: {"ok":true}
+
+4) Book the meeting (two bulletproof ways)
+A) Natural language (NLP)
+curl -sS -X POST $APP/calendar-book/command \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "userId":"'"$USER"'",
+    "text":"make a calendar meeting with \"inarvis\" tomorrow at 12:30 for 30 minutes",
+    "tz":"America/Vancouver",
+    "workHours":{"start":"09:00","end":"18:00"}
+  }'
+
+
+Success expectation: JSON includes "eventId" and "htmlLink".
+
+B) Direct (zero ambiguity)
+TOMORROW=$(date -d "+1 day" +%Y-%m-%d 2>/dev/null || gdate -d "+1 day" +%Y-%m-%d)
+curl -sS -X POST $APP/calendar-book/schedule \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "userId":"'"$USER"'",
+    "title":"Team Meeting",
+    "date":"'"$TOMORROW"'",
+    "preferredStart":"12:30",
+    "durationMins":30,
+    "tz":"America/Vancouver",
+    "attendeeAlias":"inarvis"
+  }'
+
+
+Success expectation: {"eventId":"...","htmlLink":"..."} every time.
+
+5) Agent behavior rules (hard requirements)
+
+Paste this policy into your agent logic/comments so it stops wasting money:
+
+Never show UI nags.
+
+Always read creds from /calendar-cred/state?userId=<USER>.
+
+If present, book immediately via /calendar-book/command (NLP) or /calendar-book/schedule (direct).
+
+If a booking call returns Unauthorized/Not registered, silently POST /calendar-cred/user with the same values from state to re-register, then retry once.
+
+Only error if state.connector is actually missing; otherwise return the raw JSON error from the server (no generic advice).
+
+6) Fast health checks (prove it’s live)
+curl -sS $APP/health
+# Expect: {"ok":true,"backend":"proxy"}
+
+ls -l /home/runner/workspace/data
+# Expect: calendar_credentials.db present
+
+7) If anything fails, you get actionable truth
+
+Missing creds → step 2 returns a clear error.
+
+DB path bad → step 2b shows connector:null. Fix step 0.
+
+GAS error (token mismatch, etc.) → you’ll see that exact error body; update the token and re-run 2a.
+
+Alias missing → meeting still books (no invite). Add the alias and re-book if needed.
+
+TL;DR
+
+Absolute DB path (fix).
+
+CALENDAR_BACKEND=proxy.
+
+Save connector once (API).
+
+Book via /calendar-book/command (or /schedule).
+
+Agent never asks you for UI stuff again; it uses saved creds, re-registers silently, and retries once.
+
+Follow those seven items and it will post the event—every time.

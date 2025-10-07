@@ -1,8 +1,6 @@
-import Database from "better-sqlite3";
-import path from "path";
+import { openDb } from "../../lib/db.js";
 
-const dbPath = path.join(process.cwd(), "data", "calendar_credentials.db");
-const db = new Database(dbPath);
+const db = openDb("calendar_credentials.db");
 
 function getConnector(userId: string): { webAppUrl: string; sharedToken: string } | undefined {
   return db.prepare(`SELECT web_app_url AS webAppUrl, shared_token AS sharedToken FROM user_connector WHERE user_id=?`).get(userId) as any;
