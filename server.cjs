@@ -1,82 +1,96 @@
-// server.cjs — hardened agent-first server for Render
-// Goals:
-// - /           -> redirect to /admin/index.html?admin=1
-// - /admin/*    -> serve agent UI (from repo /admin or /site/admin, whichever exists)
-// - /site/*     -> serve optional marketing pages (never at root)
-// - /health     -> 'ok'
-// - /api/ping   -> { ok: true }
-// - Extensionless paths -> agent index
-// - Loud logs of what’s actually mounted
-
+// server.cjs — auto-detect agent UI (bulletproof for Render)
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
-
-// --- Resolve folders ---
 const ROOT = __dirname;
-const SITE = path.join(ROOT, 'site');
-const ADMIN_ROOT = path.join(ROOT, 'admin');        // repo-root/admin
-const ADMIN_IN_SITE = path.join(SITE, 'admin');     // site/admin
 
-// Pick the first admin folder that actually exists
-let ADMIN = null;
-if (fs.existsSync(ADMIN_ROOT) && fs.existsSync(path.join(ADMIN_ROOT, 'index.html'))) {
-  ADMIN = ADMIN_ROOT;
-} else if (fs.existsSync(ADMIN_IN_SITE) && fs.existsSync(path.join(ADMIN_IN_SITE, 'index.html'))) {
-  ADMIN = ADMIN_IN_SITE;
-} else {
-  // Last resort: still set to repo-root/admin so errors are obvious in logs
-  ADMIN = ADMIN_ROOT;
+// Candidate agent roots (first one that exists wins)
+const CANDIDATE_DIRS = [
+  path.join(ROOT, 'admin'),               // repo-root/admin  (your CMS; also use if agent is here)
+  path.join(ROOT, 'public'),              // repo-root/public
+  path.join(ROOT, 'client', 'dist'),      // built client app (Vite/React)
+  path.join(ROOT, 'site', 'admin'),       // site/admin
+  path.join(ROOT, 'site', 'agent'),       // site/agent
+  path.join(ROOT, 'agent')                // repo-root/agent
+];
+
+// Candidate index filenames to try inside the chosen dir
+const CANDIDATE_INDEX = ['index.html', 'agent.html', 'chat.html'];
+
+// Resolve AGENT_DIR + AGENT_INDEX
+let AGENT_DIR = null;
+let AGENT_INDEX = null;
+for (const d of CANDIDATE_DIRS) {
+  if (!fs.existsSync(d)) continue;
+  for (const f of CANDIDATE_INDEX) {
+    if (fs.existsSync(path.join(d, f))) {
+      AGENT_DIR = d;
+      AGENT_INDEX = f;
+      break;
+    }
+  }
+  if (AGENT_DIR) break;
 }
 
-// --- 1) ROOT -> agent (do this BEFORE any static mounts) ---
-app.get('/', (_req, res) => res.redirect('/admin/index.html?admin=1'));
-
-// --- 2) Mount the agent UI (whatever path we resolved above) ---
-app.use('/admin', express.static(ADMIN, {
-  // Serve files exactly; don’t list directories
-  extensions: ['html']
-}));
-
-// Allow /admin (no trailing slash) to show index
-app.get('/admin', (_req, res) => res.sendFile(path.join(ADMIN, 'index.html')));
-
-// --- 3) Optional: marketing site ONLY under /site (never at root) ---
-if (fs.existsSync(SITE)) {
-  app.use('/site', express.static(SITE, { extensions: ['html'] }));
+// Fallback so errors are obvious if nothing found
+if (!AGENT_DIR) {
+  AGENT_DIR = path.join(ROOT, 'admin');
+  AGENT_INDEX = 'index.html';
 }
 
-// --- 4) Health & diagnostics ---
+const SITE_DIR   = path.join(ROOT, 'site');
+const CMS_DIR    = path.join(ROOT, 'admin'); // the content manager (may or may not be the agent)
+
+// ---- Logs so we KNOW what got mounted ----
+console.log('\n[BOOT] Path probe results:');
+for (const d of CANDIDATE_DIRS) {
+  console.log('  -', d, fs.existsSync(d) ? '(exists)' : '(missing)');
+}
+console.log('  -> SELECTED AGENT_DIR =', AGENT_DIR);
+console.log('  -> SELECTED AGENT_INDEX =', AGENT_INDEX);
+console.log('  -> SITE_DIR =', SITE_DIR, fs.existsSync(SITE_DIR) ? '(exists)' : '(missing)');
+console.log('  -> CMS_DIR  =', CMS_DIR, fs.existsSync(CMS_DIR) ? '(exists)' : '(missing)');
+
+// 1) Mount the AGENT at /agent (always)
+app.use('/agent', express.static(AGENT_DIR));
+
+// 2) Root redirects to /agent/<index>
+app.get('/', (_req, res) => res.redirect(`/agent/${AGENT_INDEX}`));
+
+// 3) Keep CMS reachable at /admin/* (if you need it)
+if (fs.existsSync(CMS_DIR)) {
+  app.use('/admin', express.static(CMS_DIR, { extensions: ['html'] }));
+  app.get('/admin', (_req, res) => res.sendFile(path.join(CMS_DIR, 'index.html')));
+}
+
+// 4) Marketing site only under /site (never root)
+if (fs.existsSync(SITE_DIR)) {
+  app.use('/site', express.static(SITE_DIR, { extensions: ['html'] }));
+}
+
+// 5) Health + ping
 app.get('/health', (_req, res) => res.status(200).send('ok'));
 app.get('/api/ping', (_req, res) => res.json({ ok: true }));
 
-// --- 5) Fallback: extensionless paths -> agent index (SPA/deep links) ---
+// 6) Fallback: extension-less paths go to agent index (prettier deep links)
 app.get('*', (req, res, next) => {
-  // If request targets a "file" with an extension, 404 it explicitly
-  if (path.extname(req.path)) return res.status(404).send('Not found');
-  // Otherwise, serve the agent index (works for pretty URLs)
-  const idx = path.join(ADMIN, 'index.html');
-  if (fs.existsSync(idx)) return res.sendFile(idx);
-  // If somehow index is missing, be noisy
-  return res.status(500).send('Agent index not found. Check /admin folder.');
+  if (!path.extname(req.path)) {
+    const idx = path.join(AGENT_DIR, AGENT_INDEX);
+    if (fs.existsSync(idx)) return res.sendFile(idx);
+  }
+  return res.status(404).send('Not found');
 });
 
-// --- 6) Start server on Render's port ---
+// 7) Start
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`\nListening on ${PORT}`);
-  console.log('Resolved paths:');
-  console.log(`  ROOT         = ${ROOT}`);
-  console.log(`  SITE         = ${SITE}  ${fs.existsSync(SITE) ? '(exists)' : '(missing)'}`);
-  console.log(`  ADMIN_ROOT   = ${ADMIN_ROOT}  ${fs.existsSync(ADMIN_ROOT) ? '(exists)' : '(missing)'}`);
-  console.log(`  ADMIN_IN_SITE= ${ADMIN_IN_SITE}  ${fs.existsSync(ADMIN_IN_SITE) ? '(exists)' : '(missing)'}`);
-  console.log(`  >>> USING ADMIN = ${ADMIN}\n`);
   console.log('Routes:');
-  console.log('  /            -> redirect to /admin/index.html?admin=1');
-  console.log('  /admin/*     -> static from ADMIN');
-  console.log('  /site/*      -> static from SITE (if exists)');
-  console.log('  /health      -> ok');
-  console.log('  /api/ping    -> { ok: true }');
+  console.log(`  /           -> /agent/${AGENT_INDEX}`);
+  console.log('  /agent/*    -> agent UI (auto-detected)');
+  console.log('  /admin/*    -> CMS (if present)');
+  console.log('  /site/*     -> marketing (if present)');
+  console.log('  /health     -> ok,  /api/ping -> {ok:true}\n');
 });
